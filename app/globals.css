@@ -1,26 +1,313 @@
 @import "tailwindcss";
 
+/* ─── KRONOS Design System ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg:          #0c1324;
+  --color-surface:     #0c1324;
+  --color-surface-low: #141b2c;
+  --color-surface-mid: #181f31;
+  --color-surface-high:#232a3c;
+  --color-surface-top: #2e3447;
+
+  --color-primary:     #4edea3;
+  --color-primary-dim: #10b981;
+  --color-secondary:   #bdc2ff;
+  --color-tertiary:    #ffb2b9;
+  --color-error:       #ff778a;
+
+  --color-on-surface:  #dce2fa;
+  --color-on-muted:    #bbcabf;
+  --color-outline:     #3c4a42;
+
+  --font-display: 'Geist', sans-serif;
+  --font-body:    'Geist', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background:           var(--color-bg);
+  --color-foreground:           var(--color-on-surface);
+  --font-sans:                  var(--font-body);
+  --font-mono:                  var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ─── Base ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  background-image:
+    radial-gradient(at 30% 10%, hsla(245, 100%, 70%, 0.06) 0px, transparent 50%),
+    radial-gradient(at 80% 0%,  hsla(163, 75%, 60%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0%  60%, hsla(343, 80%, 70%, 0.04) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, hsla(245, 100%, 65%, 0.05) 0px, transparent 50%);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ─── Glass Panel Variants ─── */
+.glass {
+  background: rgba(24, 31, 49, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top:   1px solid rgba(255,255,255,0.10);
+  border-left:  1px solid rgba(255,255,255,0.06);
+  border-right: 1px solid rgba(0,0,0,0.20);
+  border-bottom:1px solid rgba(0,0,0,0.30);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25),
+              inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.glass-active {
+  background: rgba(78, 222, 163, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(78, 222, 163, 0.20);
+  box-shadow: 0 0 24px rgba(78, 222, 163, 0.08),
+              inset 0 1px 0 rgba(78, 222, 163, 0.10);
+}
+
+.glass-error {
+  background: rgba(255,119,138, 0.06);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,119,138,0.20);
+}
+
+/* ─── Typography ─── */
+.text-display {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.text-headline {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.text-headline-sm {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.text-body { font-size: 16px; font-weight: 400; line-height: 1.6; }
+.text-mono {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+}
+.text-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.text-metric {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Glow Utilities ─── */
+.glow-primary { text-shadow: 0 0 20px rgba(78,222,163,0.5); }
+.glow-error   { text-shadow: 0 0 16px rgba(255,119,138,0.5); }
+.glow-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+/* ─── Buttons ─── */
+.btn-primary {
+  background: linear-gradient(135deg, rgba(78,222,163,0.90) 0%, rgba(16,185,129,0.90) 100%);
+  color: #002113;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 20px rgba(78,222,163,0.25), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.btn-primary:hover {
+  box-shadow: 0 0 32px rgba(78,222,163,0.45), inset 0 1px 0 rgba(255,255,255,0.45);
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid rgba(78,222,163,0.40);
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-ghost:hover {
+  background: rgba(78,222,163,0.10);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 16px rgba(78,222,163,0.20);
+}
+
+/* ─── Dial / SVG Rings ─── */
+.dial-track {
+  stroke: rgba(255,255,255,0.05);
+  stroke-width: 8;
+  fill: none;
+}
+.dial-primary {
+  stroke: #4edea3;
+  stroke-width: 8;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 8px rgba(78,222,163,0.65));
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);
+}
+.dial-secondary {
+  stroke: #bdc2ff;
+  stroke-width: 8;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 8px rgba(189,194,255,0.65));
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);
+}
+.dial-error {
+  stroke: #ff778a;
+  stroke-width: 8;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 8px rgba(255,119,138,0.65));
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─── Timeline / Calendar Bar ─── */
+.timeline-block {
+  position: absolute;
+  left: 16px; right: 16px;
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+.timeline-block:hover { filter: brightness(1.1); }
+
+/* ─── Scanline overlay ─── */
+.scanlines {
+  pointer-events: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 1px,
+    rgba(0,0,0,0.08) 1px,
+    rgba(0,0,0,0.08) 2px
+  );
+}
+
+/* ─── Collapsible side-nav group ─── */
+.sidenav-label {
+  opacity: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.25s ease;
+}
+.sidenav:hover .sidenav-label { opacity: 1; }
+
+/* ─── Bar chart ─── */
+.bar-col {
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px 4px 0 0;
+  position: relative; overflow: hidden;
+}
+.bar-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(78,222,163,0.15), rgba(78,222,163,0.75));
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -4px 12px rgba(78,222,163,0.2);
+}
+.bar-col.projected {
+  background: transparent;
+  border: 1px dashed rgba(78,222,163,0.25);
+}
+.bar-col.projected .bar-fill {
+  background: linear-gradient(to top, rgba(78,222,163,0.05), rgba(78,222,163,0.20));
+}
+
+/* ─── Chip / Badge ─── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 9999px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.chip-primary { color: var(--color-primary); background: rgba(78,222,163,0.12); }
+.chip-secondary{ color: var(--color-secondary); background: rgba(189,194,255,0.12); }
+.chip-error   { color: var(--color-error);   background: rgba(255,119,138,0.12); }
+.chip-amber   { color: #fbbf24; background: rgba(251,191,36,0.12); }
+
+/* ─── Input ─── */
+.kronos-input {
+  background: #0f172a;
+  border: 1px solid rgba(78,222,163,0.20);
+  border-radius: 8px;
+  color: var(--color-on-surface);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+.kronos-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 12px rgba(78,222,163,0.25);
+}
+.kronos-input::placeholder { color: rgba(187,202,191,0.4); }
+
+/* ─── Table ─── */
+.kronos-table { border-collapse: collapse; width: 100%; }
+.kronos-table th {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-on-muted);
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(78,222,163,0.12);
+  text-align: left;
+}
+.kronos-table td {
+  font-family: var(--font-mono); font-size: 14px;
+  color: var(--color-on-surface);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.kronos-table tr:hover td { background: rgba(78,222,163,0.03); }
+
+/* ─── Status indicator pulse ─── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.4); }
+}
+.pulse { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(78,222,163,0.25); border-radius: 2px; }

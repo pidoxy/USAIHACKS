@@ -1,65 +1,245 @@
-import Image from "next/image";
+'use client'
+import { useState, useRef } from 'react'
+import TopNav from '@/components/layout/TopNav'
+import Link from 'next/link'
 
-export default function Home() {
+const DEMO_TASKS = [
+  { id: '1', title: 'Advanced Calc Midterm Prep', due: '2026-06-28', hours: 12.0, stress: 'High Stress' },
+  { id: '2', title: 'Read Chapter 4: Thermodynamics', due: '2026-06-22', hours: 3.5, stress: 'Moderate Focus' },
+  { id: '3', title: 'Lab Report: Circuit Analysis', due: '2026-06-25', hours: 6.0, stress: 'Moderate Focus' },
+]
+
+export default function IngestionGateway() {
+  const [tasks, setTasks] = useState(DEMO_TASKS)
+  const [brainDump, setBrainDump] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [processing, setProcessing] = useState(false)
+  const [processed, setProcessed] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) simulateProcessing(file.name)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) simulateProcessing(file.name)
+  }
+
+  const simulateProcessing = (name: string) => {
+    setFileName(name)
+    setProcessing(true)
+    setProcessed(false)
+    setTimeout(() => {
+      setProcessing(false)
+      setProcessed(true)
+    }, 2200)
+  }
+
+  const removeTask = (id: string) => setTasks(t => t.filter(x => x.id !== id))
+
+  const stressColor = (s: string) =>
+    s.includes('High') ? 'var(--color-error)' : s.includes('Moderate') ? '#fbbf24' : 'var(--color-primary)'
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div style={{ minHeight: '100vh' }}>
+      <TopNav />
+
+      {/* Math watermark */}
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%',
+        transform: 'translate(-50%,-50%)',
+        fontFamily: 'var(--font-mono)', fontSize: 120,
+        color: 'rgba(78,222,163,0.025)',
+        whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 0, userSelect: 'none',
+      }}>
+        ΔS = k_B ln(Ω) + ∫(∂Q/T)dt
+      </div>
+
+      <main style={{ paddingTop: 160, paddingLeft: 48, paddingRight: 48, paddingBottom: 48, position: 'relative', zIndex: 1 }}>
+        {/* Header */}
+        <div style={{ marginBottom: 40 }}>
+          <h1 className="text-headline" style={{ color: 'var(--color-on-surface)', marginBottom: 8 }}>
+            Ingestion Gateway
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }} className="pulse" />
+            <span className="text-mono" style={{ color: 'var(--color-on-muted)' }}>
+              AWAITING DATA INPUT [SYS.READY]
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 1200 }}>
+          {/* Left: Upload Zone */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Drop Zone */}
+            <div
+              className="glass"
+              style={{ borderRadius: 16, padding: 32 }}
+              onDragOver={e => { e.preventDefault(); setDragging(true) }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleFileDrop}
+            >
+              <div
+                style={{
+                  border: `2px dashed ${dragging ? 'var(--color-primary)' : 'rgba(78,222,163,0.25)'}`,
+                  borderRadius: 12,
+                  padding: '48px 24px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  cursor: 'pointer',
+                  background: dragging ? 'rgba(78,222,163,0.05)' : 'transparent',
+                  transition: 'all 0.2s',
+                }}
+                onClick={() => fileRef.current?.click()}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-primary)', marginBottom: 16, opacity: dragging ? 1 : 0.5 }}>
+                  upload_file
+                </span>
+                {processing ? (
+                  <>
+                    <p className="text-mono" style={{ color: 'var(--color-primary)' }}>PROCESSING: {fileName}</p>
+                    <p className="text-label" style={{ color: 'var(--color-on-muted)', marginTop: 8 }}>LLM EXTRACTING CONSTRAINTS…</p>
+                    <div style={{ marginTop: 16, height: 2, width: 200, background: 'rgba(78,222,163,0.15)', borderRadius: 1, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: 'var(--color-primary)', borderRadius: 1, animation: 'progressBar 2.2s linear forwards', width: '0%' }} />
+                    </div>
+                  </>
+                ) : processed ? (
+                  <>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 24 }}>check_circle</span>
+                    <p className="text-mono" style={{ color: 'var(--color-primary)', marginTop: 8 }}>{fileName} — PARSED</p>
+                    <p className="text-label" style={{ color: 'var(--color-on-muted)', marginTop: 4 }}>CONSTRAINTS EXTRACTED TO TABLE</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-mono" style={{ color: 'var(--color-on-surface)' }}>DROP PDF SYLLABUS HERE</p>
+                    <p className="text-label" style={{ color: 'var(--color-on-muted)', marginTop: 8 }}>OR CLICK TO BROWSE</p>
+                  </>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={handleFileSelect} />
+            </div>
+
+            {/* Brain Dump + Voice */}
+            <div className="glass" style={{ borderRadius: 16, padding: 24, display: 'flex', gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label className="text-label" style={{ color: 'var(--color-primary)', display: 'block', marginBottom: 10 }}>BRAIN DUMP</label>
+                <textarea
+                  className="kronos-input"
+                  style={{ height: 120, resize: 'none' }}
+                  placeholder="Enter unstructured tasks, thoughts, deadlines, raw data…"
+                  value={brainDump}
+                  onChange={e => setBrainDump(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="glass" style={{
+                  width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(78,222,163,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--color-primary)', transition: 'all 0.2s',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 28 }}>mic</span>
+                </button>
+                <span className="text-label" style={{ color: 'var(--color-primary)', fontSize: 9 }}>VOICE</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Extracted Tasks Table */}
+          <div className="glass" style={{ borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid rgba(78,222,163,0.12)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'rgba(20,27,44,0.5)',
+            }}>
+              <span className="text-label" style={{ color: 'var(--color-primary)' }}>EXTRACTED TASKS [VALIDATION REQ]</span>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)',
+                borderRadius: 8, padding: '4px 12px',
+              }}>
+                <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>PR:</span>
+                <span className="text-mono" style={{ color: 'var(--color-primary)' }}>87.4%</span>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-secondary)' }} />
+              </div>
+            </div>
+            <table className="kronos-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Due Date</th>
+                  <th style={{ width: 80 }}>Est. (h)</th>
+                  <th style={{ width: 140 }}>Stress Level</th>
+                  <th style={{ width: 48, textAlign: 'center' }}>ACT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map(t => (
+                  <tr key={t.id}>
+                    <td>{t.title}</td>
+                    <td style={{ color: 'var(--color-secondary)' }}>{t.due}</td>
+                    <td style={{ color: 'var(--color-primary)' }}>{t.hours}</td>
+                    <td>
+                      <select className="kronos-input" style={{ padding: '4px 8px', fontSize: 12 }}>
+                        {['High Stress', 'Moderate Focus', 'Light/Easy'].map(o => (
+                          <option key={o} selected={o === t.stress}>{o}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer' }}
+                        onClick={() => removeTask(t.id)}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ marginTop: 40, display: 'flex', gap: 16, alignItems: 'center' }}>
+          <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary" style={{ padding: '16px 48px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>bolt</span>
+              ENGAGE KRONOS ENGINE
+            </button>
+          </Link>
+          <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>
+            {tasks.length} constraints loaded — deterministic simulation ready
+          </span>
+        </div>
+
+        {/* Feature cards */}
+        <div style={{ marginTop: 64, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, maxWidth: 1200 }}>
+          {[
+            { icon: 'psychology', title: 'Chrono-Kinetic Entropy', desc: 'Mathematical fatigue curves — not guesswork', color: 'var(--color-primary)' },
+            { icon: 'casino',      title: 'Monte Carlo Crisis', desc: '50 adversarial simulations against your schedule', color: 'var(--color-secondary)' },
+            { icon: 'tune',        title: 'Constraint Solver', desc: 'Auto-optimises deep-work blocks for 7h+ sleep', color: '#fbbf24' },
+            { icon: 'speed',       title: 'Velocity Normalizer', desc: 'Your personal under-estimation multiplier', color: 'var(--color-tertiary)' },
+          ].map(card => (
+            <div key={card.title} className="glass" style={{ borderRadius: 16, padding: 24 }}>
+              <span className="material-symbols-outlined" style={{ color: card.color, fontSize: 28, marginBottom: 12, display: 'block' }}>
+                {card.icon}
+              </span>
+              <p className="text-label" style={{ color: 'var(--color-on-surface)', marginBottom: 8, fontSize: 11 }}>{card.title}</p>
+              <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>{card.desc}</p>
+            </div>
+          ))}
         </div>
       </main>
+
+      <style>{`
+        @keyframes progressBar { from { width: 0% } to { width: 100% } }
+      `}</style>
     </div>
-  );
+  )
 }
