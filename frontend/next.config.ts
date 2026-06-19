@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    root: "/Users/mac/Desktop/career/code/kronos-chrono",
+  },
 };
 
 export default nextConfig;

@@ -166,19 +166,15 @@ export default function Analytics() {
               </div>
             </div>
 
-            {/* Entropy Volatility mini bars */}
+            {/* Efficiency level mini bars */}
             <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <p className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 12, fontSize: 9 }}>ENTROPY VOLATILITY</p>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 48 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <p className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>DAILY EFFICIENCY LEVEL</p>
+                <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>T-14 → NOW</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 56 }}>
                 {ETA_CURVE.map((v, i) => (
-                  <div key={i} style={{ flex: 1 }}>
-                    <div style={{
-                      height: `${(1 - v) * 100}%`,
-                      background: etaColor(v),
-                      opacity: 0.6,
-                      borderRadius: '2px 2px 0 0',
-                    }} />
-                  </div>
+                  <div key={i} title={`Day T-${14 - i}: η=${v.toFixed(2)}`} style={{ flex: 1, height: `${Math.round(v * 100)}%`, background: etaColor(v), opacity: 0.7, borderRadius: '2px 2px 0 0', minHeight: 4, transition: 'opacity 0.2s', cursor: 'pointer' }} />
                 ))}
               </div>
             </div>
