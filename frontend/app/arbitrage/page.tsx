@@ -8,9 +8,9 @@ const INITIAL_BARS = [40, 55, 30, 70, 65, 85, 90]
 const PROJECTED_BARS = [45, 60, 75]
 
 const NODE_ANALYSIS = [
-  { icon: 'hub',          sector: 'Alpha Sector', desc: 'Routing Efficiency', value: '99.2%',  color: 'var(--color-primary)' },
-  { icon: 'network_node', sector: 'Beta Sector',  desc: 'Latency Spike',     value: '42ms',   color: 'var(--color-tertiary)' },
-  { icon: 'router',       sector: 'Gamma Sector', desc: 'Load Distribution', value: 'Balanced',color: 'var(--color-on-muted)' },
+  { icon: 'hub',          sector: 'Alpha Node', desc: 'Routing Efficiency', value: '99.2%',   color: 'var(--color-primary)' },
+  { icon: 'network_node', sector: 'Beta Node',  desc: 'Latency Spike',     value: '42ms',    color: 'var(--color-tertiary)' },
+  { icon: 'router',       sector: 'Gamma Node', desc: 'Load Distribution', value: 'Balanced', color: 'var(--color-on-muted)' },
 ]
 
 export default function Arbitrage() {
@@ -99,7 +99,7 @@ export default function Arbitrage() {
           </div>
 
           {/* Node Analysis */}
-          <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative', overflow: 'hidden' }}>
+          <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, background: 'rgba(78,222,163,0.04)', borderRadius: '0 0 0 100%', filter: 'blur(20px)' }} />
             <h3 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>NODE ANALYSIS</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -107,7 +107,6 @@ export default function Arbitrage() {
                 <div
                   key={n.sector}
                   style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '12px 14px', borderRadius: 10,
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)',
                     cursor: 'pointer', transition: 'background 0.2s',
@@ -115,14 +114,12 @@ export default function Arbitrage() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span className="material-symbols-outlined" style={{ color: n.color, fontSize: 20 }}>{n.icon}</span>
-                    <div>
-                      <p className="text-body" style={{ color: 'var(--color-on-surface)', fontSize: 14 }}>{n.sector}</p>
-                      <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 11 }}>{n.desc}</p>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span className="material-symbols-outlined" style={{ color: n.color, fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
+                    <span style={{ color: 'var(--color-on-surface)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', flex: 1, whiteSpace: 'nowrap' }}>{n.sector}</span>
+                    <span className="text-mono" style={{ color: n.color, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{n.value}</span>
                   </div>
-                  <span className="text-mono" style={{ color: n.color, fontSize: 13 }}>{n.value}</span>
+                  <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 10, paddingLeft: 24 }}>{n.desc}</p>
                 </div>
               ))}
             </div>

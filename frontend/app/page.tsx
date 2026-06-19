@@ -74,7 +74,7 @@ export default function IngestionGateway() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 1200 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, maxWidth: 1200 }}>
           {/* Left: Upload Zone */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Drop Zone */}
@@ -167,35 +167,42 @@ export default function IngestionGateway() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-secondary)' }} />
               </div>
             </div>
-            <table className="kronos-table">
+            <table className="kronos-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col />
+                <col style={{ width: 68 }} />
+                <col style={{ width: 56 }} />
+                <col style={{ width: 112 }} />
+                <col style={{ width: 34 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Title</th>
-                  <th>Due Date</th>
-                  <th style={{ width: 80 }}>Est. (h)</th>
-                  <th style={{ width: 140 }}>Stress Level</th>
-                  <th style={{ width: 48, textAlign: 'center' }}>ACT</th>
+                  <th>Task Title</th>
+                  <th>Due</th>
+                  <th>h</th>
+                  <th>Stress Level</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {tasks.map(t => (
                   <tr key={t.id}>
-                    <td>{t.title}</td>
-                    <td style={{ color: 'var(--color-secondary)' }}>{t.due}</td>
-                    <td style={{ color: 'var(--color-primary)' }}>{t.hours}</td>
-                    <td>
-                      <select className="kronos-input" style={{ padding: '4px 8px', fontSize: 12 }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</td>
+                    <td style={{ color: 'var(--color-secondary)', whiteSpace: 'nowrap' }}>{t.due.slice(5)}</td>
+                    <td style={{ color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>{t.hours}h</td>
+                    <td style={{ padding: '6px 8px' }}>
+                      <select className="kronos-input" style={{ padding: '3px 4px', fontSize: 11, width: '100%' }} defaultValue={t.stress}>
                         {['High Stress', 'Moderate Focus', 'Light/Easy'].map(o => (
-                          <option key={o} selected={o === t.stress}>{o}</option>
+                          <option key={o}>{o}</option>
                         ))}
                       </select>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center', padding: '4px 2px' }}>
                       <button
                         style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer' }}
                         onClick={() => removeTask(t.id)}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
                       </button>
                     </td>
                   </tr>
