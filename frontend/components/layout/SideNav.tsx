@@ -6,37 +6,72 @@ import {
   ChartNoAxesCombined,
   FlaskConical,
   LayoutDashboard,
+  PencilLine,
   Sparkles,
 } from 'lucide-react'
+import Logo from '@/components/ui/Logo'
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Overview', href: '/dashboard' },
-  { icon: Sparkles, label: 'Build Plan', href: '/arbitrage' },
+  { icon: PencilLine, label: 'Capture', href: '/' },
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+  { icon: Sparkles, label: 'Plan', href: '/arbitrage' },
   { icon: FlaskConical, label: 'Stress Test', href: '/sandbox' },
   { icon: ChartNoAxesCombined, label: 'Insights', href: '/analytics' },
 ]
 
 export default function SideNav({ active }: { active?: string }) {
+  void active
   const path = usePathname()
-  const currentLabel =
-    navItems.find((item) => item.href === path || active === item.label)?.label ?? 'Overview'
 
   return (
-    <aside className="sidenav-shell">
-      <div className="sidenav-heading">
-        <span className="text-label">Navigator</span>
-        <span className="text-mono">You are in {currentLabel}</span>
-      </div>
+    <>
+      <aside className="sidenav-shell">
+        <Link href="/" className="sidenav-brand">
+          <Logo size={30} fontSize={18} />
+          <div className="sidenav-brand-copy">
+            <span className="text-label">Second brain</span>
+            <span className="text-mono">Your study playground</span>
+          </div>
+        </Link>
 
-      <nav className="sidenav-group" aria-label="Workspace">
+        <Link href="/" className="sidenav-cta">
+          Quick Capture
+        </Link>
+
+        <nav className="sidenav-group" aria-label="Workspace">
+          {navItems.map((item) => {
+            const isActive = item.href === path
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`sidenav-link${isActive ? ' is-active' : ''}`}
+              >
+                <span className="sidenav-icon-wrap">
+                  <Icon size={18} />
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="sidenav-footer-note">
+          <span className="text-label">How to use it</span>
+          <p className="text-mono">Capture tasks, build a plan, then pressure-test the week.</p>
+        </div>
+      </aside>
+
+      <nav className="mobile-dock" aria-label="Mobile">
         {navItems.map((item) => {
-          const isActive = item.href === path || active === item.label
+          const isActive = item.href === path
           const Icon = item.icon
           return (
             <Link
               key={item.label}
               href={item.href}
-              className={`sidenav-link${isActive ? ' is-active' : ''}`}
+              className={`mobile-dock-link${isActive ? ' is-active' : ''}`}
             >
               <Icon size={18} />
               <span>{item.label}</span>
@@ -44,11 +79,6 @@ export default function SideNav({ active }: { active?: string }) {
           )
         })}
       </nav>
-
-      <div className="sidenav-footer-note">
-        <span className="text-label">Flow</span>
-        <p className="text-mono">Add tasks, build a plan, then test your week.</p>
-      </div>
-    </aside>
+    </>
   )
 }

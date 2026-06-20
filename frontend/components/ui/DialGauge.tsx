@@ -24,9 +24,9 @@ export default function DialGauge({
   const pct = Math.min(value / max, 1)
 
   const colors: Record<string, string> = {
-    primary:   '#4edea3',
-    secondary: '#bdc2ff',
-    error:     '#ff778a',
+    primary:   '#2d58bd',
+    secondary: '#8fdcc2',
+    error:     '#cf3f4d',
   }
   const c = colors[variant]
 

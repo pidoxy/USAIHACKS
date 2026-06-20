@@ -4,8 +4,8 @@ import './globals.css'
 import { TaskStoreProvider } from '@/lib/store/TaskStore'
 
 export const metadata: Metadata = {
-  title: 'KRONOS — Chrono-Kinetic Simulation Engine',
-  description: 'Stress-test your life with adversarial simulations before you risk your real-world GPA or career.',
+  title: 'Kronos',
+  description: 'Turn your tasks into a study plan that fits your real week.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Quicksand:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <link
@@ -24,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <div className="scanlines" />
         <TaskStoreProvider>{children}</TaskStoreProvider>
       </body>
     </html>

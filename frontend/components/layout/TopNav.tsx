@@ -1,121 +1,90 @@
 'use client'
 
-import Link from 'next/link'
+import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { CalendarSync, Link2, LoaderCircle } from 'lucide-react'
-import { api, ApiError } from '@/lib/api/client'
 import { useStore } from '@/lib/store/TaskStore'
-import Logo from '@/components/ui/Logo'
-import type { MeResponse } from '@/lib/api/types'
 
-const links = [
-  { href: '/', label: 'Add Tasks' },
-  { href: '/dashboard', label: 'Overview' },
-  { href: '/arbitrage', label: 'Plan' },
-  { href: '/sandbox', label: 'Stress Test' },
-  { href: '/analytics', label: 'Insights' },
-]
+const pageMeta: Record<string, { title: string; subtitle: string }> = {
+  '/': {
+    title: 'Quick Capture',
+    subtitle: 'Add your tasks, notes, or syllabus and let Kronos sort them.',
+  },
+  '/dashboard': {
+    title: "Today's Pulse",
+    subtitle: 'See what matters most and what to do next.',
+  },
+  '/arbitrage': {
+    title: 'Schedule Optimizer',
+    subtitle: 'Build a study plan that fits around classes and real life.',
+  },
+  '/sandbox': {
+    title: 'Stress Test',
+    subtitle: 'Try rough-week scenarios before they happen for real.',
+  },
+  '/analytics': {
+    title: 'Insights',
+    subtitle: 'Learn when you focus best and how your week is changing.',
+  },
+}
 
 export default function TopNav() {
   const path = usePathname()
-  const { userId, setUserId } = useStore()
-  const [authBusy, setAuthBusy] = useState(false)
-  const [authErr, setAuthErr] = useState<string | null>(null)
-  const [me, setMe] = useState<MeResponse | null>(null)
+  const {
+    authBusy,
+    authError,
+    authNotice,
+    userId,
+    me,
+    connectCalendar,
+    disconnectCalendar,
+  } = useStore()
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const uid = params.get('user_id')
-    if (uid && Number(uid)) {
-      setUserId(Number(uid))
-      params.delete('user_id')
-      const qs = params.toString()
-      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''))
-    }
-  }, [setUserId])
+  const content = useMemo(
+    () => pageMeta[path] ?? pageMeta['/'],
+    [path],
+  )
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    api.me(userId)
-      .then((res) => {
-        if (!cancelled) setMe(res)
-      })
-      .catch(() => {
-        if (!cancelled) setMe(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [userId])
-
-  const activeMe = userId ? me : null
-
-  const connect = async () => {
-    if (authBusy) return
-    setAuthErr(null)
-    setAuthBusy(true)
-    try {
-      const { auth_url } = await api.googleAuthUrl()
-      window.location.href = auth_url
-    } catch (e) {
-      setAuthErr(e instanceof ApiError ? e.message : 'Auth unavailable')
-      setAuthBusy(false)
-    }
-  }
-
-  const disconnect = () => setUserId(null)
-  const activeLink = links.find((link) => link.href === path)?.label ?? 'Add Tasks'
+  const statusText = authError
+    ? authError
+    : authNotice
+      ? authNotice
+      : userId
+        ? 'Calendar linked'
+        : 'Calendar not linked'
 
   return (
     <header className="topnav-shell">
-      <div className="topnav-brand">
-        <Link href="/" className="topnav-logo">
-          <Logo size={28} fontSize={20} />
-        </Link>
-        <div className="topnav-status">
-          <span className="text-label">Workspace</span>
-          <span className="text-mono">{activeLink}</span>
-        </div>
-      </div>
-
-      <div className="topnav-center">
-        <nav className="topnav-links" aria-label="Primary">
-          {links.map((l) => {
-            const active = path === l.href
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`topnav-link${active ? ' is-active' : ''}`}
-              >
-                {l.label}
-              </Link>
-            )
-          })}
-        </nav>
+      <div className="topnav-copy">
+        <span className="topnav-kicker">Kronos workspace</span>
+        <h1 className="topnav-title">{content.title}</h1>
+        <p className="topnav-subtitle">{content.subtitle}</p>
       </div>
 
       <div className="topnav-actions">
+        <div className="topnav-context">
+          <span className="text-label">Live status</span>
+          <span className="text-mono">{statusText}</span>
+        </div>
+
         {userId ? (
           <button
-            onClick={disconnect}
-            title={`${activeMe?.email ?? `Connected user ${userId}`} — click to disconnect`}
+            onClick={disconnectCalendar}
+            title={`${me?.email ?? `Connected user ${userId}`} — click to disconnect`}
             className="topnav-connection is-live"
           >
-            <Link2 size={14} />
-            <span>{activeMe?.name ? `${activeMe.name} Linked` : 'Calendar Linked'}</span>
+            <Link2 size={16} />
+            <span>{me?.name ? `${me.name} linked` : 'Calendar linked'}</span>
           </button>
         ) : (
           <button
-            onClick={connect}
+            onClick={connectCalendar}
             disabled={authBusy}
-            title={authErr ?? 'Connect Google Calendar'}
-            className={`topnav-connection${authErr ? ' is-error' : ''}`}
+            title={authError ?? 'Connect Google Calendar'}
+            className={`topnav-connection${authError ? ' is-error' : ''}`}
           >
-            {authBusy ? <LoaderCircle size={14} className="spin" /> : <CalendarSync size={14} />}
-            <span>{authBusy ? 'Connecting...' : authErr ? 'Auth Offline' : 'Connect Calendar'}</span>
+            {authBusy ? <LoaderCircle size={16} className="spin" /> : <CalendarSync size={16} />}
+            <span>{authBusy ? 'Connecting...' : authError ? 'Try calendar again' : 'Connect calendar'}</span>
           </button>
         )}
       </div>

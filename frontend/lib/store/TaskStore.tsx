@@ -14,8 +14,10 @@ import type {
   ExtractedTask,
   ArbitrageResponse,
   SimulateResponse,
+  MeResponse,
 } from "@/lib/api/types";
 import { API_BASE } from "@/lib/api/config";
+import { api, ApiError } from "@/lib/api/client";
 
 /* ---------- stress <-> cognitive_weight helpers (UI uses labels, API uses weights) ---------- */
 
@@ -52,6 +54,10 @@ export function withIds(tasks: ExtractedTask[]): KronosTask[] {
 
 interface StoreShape {
   hydrated: boolean;
+  authReady: boolean;
+  authBusy: boolean;
+  authError: string | null;
+  authNotice: string | null;
   tasks: KronosTask[];
   setTasks: (t: KronosTask[]) => void;
   addTasks: (t: KronosTask[]) => void;
@@ -65,16 +71,25 @@ interface StoreShape {
   setLastSimulation: (r: SimulateResponse | null) => void;
 
   userId: number | null;
+  me: MeResponse | null;
   setUserId: (id: number | null) => void;
+  connectCalendar: () => Promise<void>;
+  disconnectCalendar: () => void;
+  clearAuthNotice: () => void;
 }
 
 const StoreContext = createContext<StoreShape | null>(null);
 
 const LS_TASKS = "kronos.tasks";
 const LS_USER = "kronos.userId";
+const SS_AUTH_RETURN_TO = "kronos.authReturnTo";
 
 export function TaskStoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [tasks, setTasksState] = useState<KronosTask[]>([]);
   const [lastArbitrage, setLastArbitrage] = useState<ArbitrageResponse | null>(
     null,
@@ -83,6 +98,7 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
     null,
   );
   const [userId, setUserIdState] = useState<number | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(null);
 
   // Hydrate from localStorage on mount (client only).
   useEffect(() => {
@@ -97,6 +113,25 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
         }
         const rawUser = localStorage.getItem(LS_USER);
         if (rawUser) setUserIdState(Number(rawUser) || null);
+        const url = new URL(window.location.href);
+        const callbackUserId = url.searchParams.get("user_id");
+        if (callbackUserId && Number(callbackUserId)) {
+          const nextUserId = Number(callbackUserId);
+          setUserIdState(nextUserId);
+          localStorage.setItem(LS_USER, String(nextUserId));
+          setAuthNotice(
+            "Calendar connected. Kronos can now plan around your real schedule.",
+          );
+          url.searchParams.delete("user_id");
+          const cleaned = `${url.pathname}${url.search}${url.hash}`;
+          const returnTo = sessionStorage.getItem(SS_AUTH_RETURN_TO);
+          sessionStorage.removeItem(SS_AUTH_RETURN_TO);
+          window.history.replaceState({}, "", cleaned || "/");
+          if (returnTo && returnTo !== cleaned) {
+            window.location.replace(returnTo);
+            return;
+          }
+        }
       } catch {
         /* ignore corrupt storage */
       }
@@ -134,6 +169,52 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [userId, hydrated]);
 
+  // Confirm stored auth state against the backend.
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (userId == null) {
+        setMe(null);
+        setAuthReady(true);
+        setAuthBusy(false);
+        return;
+      }
+      setAuthBusy(true);
+      setAuthError(null);
+      api
+        .me(userId)
+        .then((profile) => {
+          if (cancelled) return;
+          setMe(profile);
+          setAuthReady(true);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setMe(null);
+          setUserIdState(null);
+          try {
+            localStorage.removeItem(LS_USER);
+          } catch {
+            /* ignore */
+          }
+          setAuthError(
+            e instanceof ApiError
+              ? e.message
+              : "Could not confirm your calendar login.",
+          );
+          setAuthReady(true);
+        })
+        .finally(() => {
+          if (!cancelled) setAuthBusy(false);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, userId]);
+
   const setTasks = useCallback((t: KronosTask[]) => setTasksState(t), []);
   const addTasks = useCallback(
     (t: KronosTask[]) => setTasksState((prev) => [...prev, ...t]),
@@ -152,10 +233,41 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
   );
   const clearTasks = useCallback(() => setTasksState([]), []);
   const setUserId = useCallback((id: number | null) => setUserIdState(id), []);
+  const clearAuthNotice = useCallback(() => setAuthNotice(null), []);
+  const disconnectCalendar = useCallback(() => {
+    setUserIdState(null);
+    setMe(null);
+    setAuthError(null);
+    setAuthNotice("Calendar disconnected.");
+  }, []);
+  const connectCalendar = useCallback(async () => {
+    if (authBusy) return;
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      sessionStorage.setItem(
+        SS_AUTH_RETURN_TO,
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+      const { auth_url } = await api.googleAuthUrl();
+      window.location.href = auth_url;
+    } catch (e) {
+      setAuthBusy(false);
+      setAuthError(
+        e instanceof ApiError
+          ? e.message
+          : "Calendar connection is unavailable right now.",
+      );
+    }
+  }, [authBusy]);
 
   const value = useMemo<StoreShape>(
     () => ({
       hydrated,
+      authReady,
+      authBusy,
+      authError,
+      authNotice,
       tasks,
       setTasks,
       addTasks,
@@ -167,10 +279,18 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
       lastSimulation,
       setLastSimulation,
       userId,
+      me,
       setUserId,
+      connectCalendar,
+      disconnectCalendar,
+      clearAuthNotice,
     }),
     [
       hydrated,
+      authReady,
+      authBusy,
+      authError,
+      authNotice,
       tasks,
       setTasks,
       addTasks,
@@ -180,7 +300,11 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
       lastArbitrage,
       lastSimulation,
       userId,
+      me,
       setUserId,
+      connectCalendar,
+      disconnectCalendar,
+      clearAuthNotice,
     ],
   );
 
