@@ -67,7 +67,7 @@ select {
 .app-main {
   width: calc(100% - 24px);
   margin: 0 auto;
-  padding: 136px 0 24px;
+  padding: 132px 0 24px;
 }
 
 .page-stack {
@@ -254,18 +254,17 @@ select {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  padding: 12px;
-  border-radius: 18px;
+  padding: 10px 12px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(20, 29, 42, 0.98);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
 }
 
 .topnav-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
@@ -274,7 +273,10 @@ select {
 }
 
 .topnav-status {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .topnav-links {
@@ -285,9 +287,13 @@ select {
   padding-bottom: 2px;
 }
 
+.topnav-center {
+  width: 100%;
+}
+
 .topnav-link {
   position: relative;
-  padding: 9px 10px;
+  padding: 10px 12px;
   border-radius: 12px;
   color: var(--color-on-muted);
   text-decoration: none;
@@ -304,7 +310,7 @@ select {
 .topnav-link:hover,
 .topnav-link.is-active {
   color: var(--color-on-surface);
-  background: var(--color-surface-low);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .topnav-link.is-active::after {
@@ -323,6 +329,7 @@ select {
   align-items: center;
   gap: 10px;
   width: 100%;
+  justify-content: flex-start;
 }
 
 .topnav-connection,
@@ -336,7 +343,7 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-radius: 12px;
   cursor: pointer;
   font-family: var(--font-mono);
@@ -371,8 +378,8 @@ select {
 .sidenav-heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px 14px;
+  gap: 6px;
+  padding: 2px 2px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -384,25 +391,25 @@ select {
 .sidenav-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sidenav-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 14px 14px;
+  border-radius: 16px;
   color: var(--color-on-muted);
   text-decoration: none;
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.04);
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .sidenav-link:hover,
 .sidenav-link.is-active {
   color: var(--color-on-surface);
-  background: var(--color-surface-low);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sidenav-link.is-active {
@@ -415,6 +422,18 @@ select {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.sidenav-footer-note {
+  margin-top: auto;
+  padding: 16px 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidenav-footer-note p {
+  margin: 8px 0 0;
+  color: var(--color-on-muted);
+  font-size: 12px;
 }
 
 .text-display {
@@ -704,7 +723,7 @@ select {
 
 @media (min-width: 920px) {
   .app-main {
-    padding-top: 150px;
+    padding-top: 154px;
   }
 
   .hero-title-row {
@@ -718,33 +737,45 @@ select {
     right: max(20px, env(safe-area-inset-right));
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 16px;
-    padding: 14px 16px;
-    border-radius: 20px;
+    gap: 18px;
+    padding: 12px 16px;
+    border-radius: 18px;
   }
 
   .topnav-brand {
     width: auto;
+    min-width: 280px;
     justify-content: start;
   }
 
   .topnav-status {
-    display: inline-flex;
+    display: flex;
+  }
+
+  .topnav-center {
+    display: flex;
+    justify-content: center;
   }
 
   .topnav-links {
+    width: auto;
     justify-content: center;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
   }
 
   .topnav-actions {
     width: auto;
+    justify-content: flex-end;
   }
 }
 
 @media (min-width: 1180px) {
   .app-main {
     width: min(100% - 48px, 1440px);
-    padding: 150px 0 40px 112px;
+    padding: 154px 0 40px 248px;
   }
 
   .dashboard-grid {
@@ -765,16 +796,16 @@ select {
 
   .sidenav-shell {
     position: fixed;
-    top: 122px;
+    top: 116px;
     left: 24px;
     bottom: 24px;
     z-index: 40;
-    width: 228px;
+    width: 200px;
     display: flex;
     flex-direction: column;
     gap: 18px;
     padding: 18px 14px;
-    border-radius: 22px;
+    border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(20, 29, 42, 0.98);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);

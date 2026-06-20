@@ -66,6 +66,7 @@ export default function TopNav() {
   }
 
   const disconnect = () => setUserId(null)
+  const activeLink = links.find((link) => link.href === path)?.label ?? 'Add Tasks'
 
   return (
     <header className="topnav-shell">
@@ -74,25 +75,27 @@ export default function TopNav() {
           <Logo size={28} fontSize={20} />
         </Link>
         <div className="topnav-status">
-          <span className="glow-dot pulse" />
-          <span className="text-mono">Plan schoolwork with your real calendar</span>
+          <span className="text-label">Workspace</span>
+          <span className="text-mono">{activeLink}</span>
         </div>
       </div>
 
-      <nav className="topnav-links" aria-label="Primary">
-        {links.map((l) => {
-          const active = path === l.href
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`topnav-link${active ? ' is-active' : ''}`}
-            >
-              {l.label}
-            </Link>
-          )
-        })}
-      </nav>
+      <div className="topnav-center">
+        <nav className="topnav-links" aria-label="Primary">
+          {links.map((l) => {
+            const active = path === l.href
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`topnav-link${active ? ' is-active' : ''}`}
+              >
+                {l.label}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
 
       <div className="topnav-actions">
         {userId ? (

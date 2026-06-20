@@ -18,12 +18,14 @@ const navItems = [
 
 export default function SideNav({ active }: { active?: string }) {
   const path = usePathname()
+  const currentLabel =
+    navItems.find((item) => item.href === path || active === item.label)?.label ?? 'Overview'
 
   return (
     <aside className="sidenav-shell">
       <div className="sidenav-heading">
-        <span className="text-label">Study Tools</span>
-        <span className="text-mono">Core screens only</span>
+        <span className="text-label">Navigator</span>
+        <span className="text-mono">You are in {currentLabel}</span>
       </div>
 
       <nav className="sidenav-group" aria-label="Workspace">
@@ -42,6 +44,11 @@ export default function SideNav({ active }: { active?: string }) {
           )
         })}
       </nav>
+
+      <div className="sidenav-footer-note">
+        <span className="text-label">Flow</span>
+        <p className="text-mono">Add tasks, build a plan, then test your week.</p>
+      </div>
     </aside>
   )
 }
