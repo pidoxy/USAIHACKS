@@ -2,34 +2,43 @@
 import { useState } from 'react'
 import TopNav from '@/components/layout/TopNav'
 import SideNav from '@/components/layout/SideNav'
-import { runMonteCarlo } from '@/lib/engine/monteCarlo'
-import type { Crisis } from '@/lib/engine/monteCarlo'
-import type { Task } from '@/lib/engine/entropy'
+import { api, ApiError } from '@/lib/api/client'
+import { useStore, toSimulateTasks } from '@/lib/store/TaskStore'
+import type { SimulateResponse, SimulateTaskIn } from '@/lib/api/types'
 
-const BASE_TASKS: Task[] = [
-  { id: '1', title: 'Advanced Calc Midterm', dueDate: '2026-06-28', hoursEstimated: 12, stressLevel: 'high' },
-  { id: '2', title: 'Lab Report',             dueDate: '2026-06-25', hoursEstimated: 6,  stressLevel: 'medium' },
-  { id: '3', title: 'Reading Assignment',     dueDate: '2026-06-22', hoursEstimated: 3,  stressLevel: 'low' },
+interface Inject {
+  name: string
+  status: string
+  intensity: number
+  duration: number
+}
+
+const PRESET_CRISES: Inject[] = [
+  { name: 'Client Site Visit',  status: 'Preset', intensity: 6, duration: 8 },
+  { name: 'System Outage',      status: 'Preset', intensity: 9, duration: 12 },
+  { name: 'Unexpected Illness', status: 'Preset', intensity: 7, duration: 48 },
+  { name: 'Family Emergency',   status: 'Preset', intensity: 8, duration: 24 },
 ]
 
-const PRESET_CRISES: Crisis[] = [
-  { name: 'Client Site Visit',   durationHours: 8,  intensityScore: 6 },
-  { name: 'System Outage',       durationHours: 12, intensityScore: 9 },
-  { name: 'Unexpected Illness',  durationHours: 48, intensityScore: 7 },
-  { name: 'Family Emergency',    durationHours: 24, intensityScore: 8 },
-]
-
-const ACTIVE_INJECTS = [
+const ACTIVE_INJECTS: Inject[] = [
   { name: 'Client Site Visit', status: 'Awaiting Input', intensity: 6, duration: 8 },
 ]
 
+// Intensity 1–10 → cognitive_weight ~0.75–3.0
+const intensityToWeight = (i: number) => Math.round((0.5 + i * 0.25) * 100) / 100
+
+const soonISO = (daysAhead: number) =>
+  new Date(Date.now() + daysAhead * 86400000).toISOString().slice(0, 10)
+
 export default function Sandbox() {
+  const { tasks, lastSimulation, setLastSimulation } = useStore()
   const [title, setTitle]         = useState('')
   const [duration, setDuration]   = useState('')
   const [intensity, setIntensity] = useState(5)
-  const [injects, setInjects]     = useState(ACTIVE_INJECTS)
-  const [result, setResult]       = useState<ReturnType<typeof runMonteCarlo> | null>(null)
+  const [injects, setInjects]     = useState<Inject[]>(ACTIVE_INJECTS)
+  const [result, setResult]       = useState<SimulateResponse | null>(lastSimulation)
   const [running, setRunning]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
 
   const addInject = () => {
     if (!title) return
@@ -37,23 +46,44 @@ export default function Sandbox() {
     setTitle(''); setDuration(''); setIntensity(5)
   }
 
-  const runSim = () => {
+  const runSim = async () => {
+    setError(null)
     setRunning(true)
-    const crises: Crisis[] = injects.map(i => ({
-      name: i.name, durationHours: i.duration, intensityScore: i.intensity,
+    // Base tasks from the shared store + each injected crisis modelled as extra load.
+    const crisisTasks: SimulateTaskIn[] = injects.map((inj, i) => ({
+      id: `crisis-${i}`,
+      title: inj.name,
+      due_date: soonISO(2),
+      workload_hours: Math.max(1, inj.duration),
+      cognitive_weight: intensityToWeight(inj.intensity),
+      is_flexible: false,
+      category: 'Crisis',
+      completed_hours: 0,
     }))
-    setTimeout(() => {
-      const r = runMonteCarlo(BASE_TASKS, 50, crises)
-      setResult(r)
+    const payload = [...toSimulateTasks(tasks), ...crisisTasks]
+    if (payload.length === 0) {
+      setError('Add at least one task (ingest one) or inject a crisis vector before running.')
       setRunning(false)
-    }, 1800)
+      return
+    }
+    try {
+      const r = await api.simulate({ tasks: payload, n_runs: 50, hours_of_sleep: 7 })
+      setResult(r)
+      setLastSimulation(r)
+    } catch (e) {
+      setError(e instanceof ApiError ? `Simulation failed: ${e.message}` : 'Simulation failed.')
+    } finally {
+      setRunning(false)
+    }
   }
 
-  const rpColor = (rp: number) =>
-    rp >= 60 ? 'var(--color-primary)' : rp >= 30 ? '#fbbf24' : 'var(--color-error)'
-
+  const survivalPct = result ? Math.round((result.survival_count / result.total_runs) * 100) : 0
   const survivalColor = (r: number) =>
     r >= 60 ? 'var(--color-primary)' : r >= 30 ? '#fbbf24' : 'var(--color-error)'
+  const scColor = (sc: number) =>
+    sc <= 5 ? 'var(--color-primary)' : sc <= 10 ? '#fbbf24' : 'var(--color-error)'
+
+  const maxSc = result ? Math.max(...result.runs.map(r => r.final_sc), 1) : 1
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -65,14 +95,27 @@ export default function Sandbox() {
           <div>
             <h1 className="text-headline" style={{ color: 'var(--color-on-surface)', marginBottom: 6 }}>Scenario Sandbox</h1>
             <p className="text-mono" style={{ color: 'var(--color-on-muted)' }}>
-              STRESS-TESTING ENVIRONMENT // SESSION: A-942
+              STRESS-TESTING ENVIRONMENT // {tasks.length} BASE TASKS LOADED
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(20,27,44,0.8)', border: '1px solid rgba(78,222,163,0.2)', borderRadius: 8, padding: '6px 14px' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }} className="pulse" />
-            <span className="text-label" style={{ color: 'var(--color-primary)' }}>PR: 98.2%</span>
+            <span className="text-label" style={{ color: 'var(--color-primary)' }}>
+              {result ? `RP: ${Math.round(result.path_resilience)}%` : 'PR: READY'}
+            </span>
           </div>
         </div>
+
+        {error && (
+          <div style={{
+            marginBottom: 20, padding: '12px 20px', borderRadius: 10,
+            background: 'rgba(255,119,138,0.08)', border: '1px solid rgba(255,119,138,0.3)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <span className="material-symbols-outlined" style={{ color: 'var(--color-error)', fontSize: 20 }}>error</span>
+            <span className="text-mono" style={{ color: 'var(--color-error)', fontSize: 12 }}>{error}</span>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
           {/* Left: Inject Panel */}
@@ -119,7 +162,7 @@ export default function Sandbox() {
                 {PRESET_CRISES.map(c => (
                   <button
                     key={c.name}
-                    onClick={() => setInjects(prev => [...prev, { name: c.name, status: 'Preset', intensity: c.intensityScore, duration: c.durationHours }])}
+                    onClick={() => setInjects(prev => [...prev, { ...c }])}
                     style={{
                       background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
@@ -130,7 +173,7 @@ export default function Sandbox() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                   >
                     {c.name}
-                    <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>×{c.intensityScore}</span>
+                    <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>×{c.intensity}</span>
                   </button>
                 ))}
               </div>
@@ -169,7 +212,7 @@ export default function Sandbox() {
                   </div>
                 ))}
                 {injects.length === 0 && (
-                  <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12, padding: '8px 0' }}>No vectors injected yet.</p>
+                  <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12, padding: '8px 0' }}>No vectors injected — simulating base schedule only.</p>
                 )}
               </div>
             </div>
@@ -191,12 +234,15 @@ export default function Sandbox() {
                 <div className="glass" style={{ borderRadius: 16, padding: 24 }}>
                   <h4 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 16 }}>SURVIVAL PROBABILITY</h4>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 8 }}>
-                    <span className="text-display" style={{ color: survivalColor(result.survivalRate), fontSize: 52 }}>
-                      {result.survivalRate}%
+                    <span className="text-display" style={{ color: survivalColor(survivalPct), fontSize: 52 }}>
+                      {survivalPct}%
+                    </span>
+                    <span className="text-mono" style={{ color: 'var(--color-on-muted)', paddingBottom: 8, fontSize: 12 }}>
+                      {result.survival_count}/{result.total_runs} survived
                     </span>
                   </div>
                   <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>
-                    {result.survivalRate >= 60 ? 'Schedule survives most crises.' : result.survivalRate >= 30 ? 'High-risk schedule — intervention needed.' : 'CRITICAL — Schedule failure likely.'}
+                    {result.ui_label_rp}
                   </p>
                 </div>
 
@@ -204,13 +250,14 @@ export default function Sandbox() {
                   <h4 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 16 }}>ENTROPY ANALYSIS</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
-                      { label: 'Avg Peak Entropy', value: `${result.avgPeakEntropy.toLocaleString()}`, unit: 'Sc' },
-                      { label: 'Worst-Case Rp',    value: `${result.worstCaseRp}%`,                   unit: '', color: rpColor(result.worstCaseRp) },
-                      { label: 'Best-Case Rp',     value: `${result.bestCaseRp}%`,                    unit: '', color: 'var(--color-primary)' },
-                    ].map(({ label, value, unit, color }) => (
+                      { label: 'Avg Context-Switch Sc', value: result.avg_sc.toFixed(2),  color: scColor(result.avg_sc) },
+                      { label: 'Worst-Case Sc',          value: result.worst_sc.toFixed(2), color: scColor(result.worst_sc) },
+                      { label: 'Best-Case Sc',           value: result.best_sc.toFixed(2),  color: 'var(--color-primary)' },
+                      { label: 'Path Resilience',        value: `${Math.round(result.path_resilience)}%`, color: survivalColor(result.path_resilience) },
+                    ].map(({ label, value, color }) => (
                       <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>{label}</span>
-                        <span className="text-mono" style={{ color: color || 'var(--color-on-surface)', fontSize: 12 }}>{value} <span style={{ opacity: 0.5 }}>{unit}</span></span>
+                        <span className="text-mono" style={{ color: color || 'var(--color-on-surface)', fontSize: 12 }}>{value}</span>
                       </div>
                     ))}
                   </div>
@@ -218,18 +265,19 @@ export default function Sandbox() {
 
                 {/* Simulation run mini bars */}
                 <div className="glass" style={{ gridColumn: 'span 2', borderRadius: 16, padding: 24 }}>
-                  <h4 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 16 }}>50 SIMULATION RUNS — PATH RESILIENCE DISTRIBUTION</h4>
+                  <h4 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 6 }}>50 SIMULATION RUNS — CONTEXT-SWITCH ENTROPY (Sc) PER RUN</h4>
+                  <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 11, marginBottom: 16 }}>{result.ui_label_sc}</p>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 80 }}>
                     {result.runs.map((r, i) => (
                       <div
                         key={i}
                         style={{
-                          flex: 1, height: `${Math.max(5, r.finalRp)}%`,
+                          flex: 1, height: `${Math.max(5, (r.final_sc / maxSc) * 100)}%`,
                           background: r.survived ? 'rgba(78,222,163,0.6)' : 'rgba(255,119,138,0.6)',
                           borderRadius: '2px 2px 0 0',
                           boxShadow: r.survived ? '0 -2px 6px rgba(78,222,163,0.3)' : '0 -2px 6px rgba(255,119,138,0.3)',
                         }}
-                        title={`Run ${i+1}: Rp=${r.finalRp}% — ${r.survived ? 'SURVIVED' : 'FAILED'}`}
+                        title={`Run ${i + 1}: Sc=${r.final_sc.toFixed(2)} — ${r.survived ? 'SURVIVED' : 'FAILED'}${r.sick_day != null ? ` (sick day ${r.sick_day})` : ''}`}
                       />
                     ))}
                   </div>
@@ -240,7 +288,7 @@ export default function Sandbox() {
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(255,119,138,0.6)' }} />
-                      <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 11 }}>Failed</span>
+                      <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 11 }}>Failed (missed deadline)</span>
                     </span>
                   </div>
                 </div>

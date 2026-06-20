@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { TaskStoreProvider } from '@/lib/store/TaskStore'
 
 export const metadata: Metadata = {
   title: 'KRONOS — Chrono-Kinetic Simulation Engine',
@@ -23,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="scanlines" />
-        {children}
+        <TaskStoreProvider>{children}</TaskStoreProvider>
       </body>
     </html>
   )

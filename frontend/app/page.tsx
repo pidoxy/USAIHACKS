@@ -2,48 +2,77 @@
 import { useState, useRef } from 'react'
 import TopNav from '@/components/layout/TopNav'
 import Link from 'next/link'
-
-const DEMO_TASKS = [
-  { id: '1', title: 'Advanced Calc Midterm Prep', due: '2026-06-28', hours: 12.0, stress: 'High Stress' },
-  { id: '2', title: 'Read Chapter 4: Thermodynamics', due: '2026-06-22', hours: 3.5, stress: 'Moderate Focus' },
-  { id: '3', title: 'Lab Report: Circuit Analysis', due: '2026-06-25', hours: 6.0, stress: 'Moderate Focus' },
-]
+import { api, ApiError } from '@/lib/api/client'
+import {
+  useStore,
+  withIds,
+  weightToStress,
+  stressToWeight,
+  STRESS_LABELS,
+  type StressLabel,
+} from '@/lib/store/TaskStore'
 
 export default function IngestionGateway() {
-  const [tasks, setTasks] = useState(DEMO_TASKS)
+  const { tasks, addTasks, removeTask, updateTask, hydrated } = useStore()
   const [brainDump, setBrainDump] = useState('')
   const [dragging, setDragging] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
   const [processed, setProcessed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [textBusy, setTextBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const ingestFile = async (file: File) => {
+    setError(null)
+    setFileName(file.name)
+    setProcessing(true)
+    setProcessed(false)
+    try {
+      const res = await api.ingestPdf(file)
+      addTasks(withIds(res.tasks))
+      setProcessed(true)
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? `PDF ingestion failed: ${e.message}`
+          : 'PDF ingestion failed.',
+      )
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
     const file = e.dataTransfer.files[0]
-    if (file) simulateProcessing(file.name)
+    if (file) ingestFile(file)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) simulateProcessing(file.name)
+    if (file) ingestFile(file)
   }
 
-  const simulateProcessing = (name: string) => {
-    setFileName(name)
-    setProcessing(true)
-    setProcessed(false)
-    setTimeout(() => {
-      setProcessing(false)
-      setProcessed(true)
-    }, 2200)
+  const ingestText = async () => {
+    if (!brainDump.trim() || textBusy) return
+    setError(null)
+    setTextBusy(true)
+    try {
+      const res = await api.ingestText(brainDump.trim())
+      addTasks(withIds(res.tasks))
+      setBrainDump('')
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? `Text extraction failed: ${e.message}`
+          : 'Text extraction failed.',
+      )
+    } finally {
+      setTextBusy(false)
+    }
   }
-
-  const removeTask = (id: string) => setTasks(t => t.filter(x => x.id !== id))
-
-  const stressColor = (s: string) =>
-    s.includes('High') ? 'var(--color-error)' : s.includes('Moderate') ? '#fbbf24' : 'var(--color-primary)'
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -69,10 +98,25 @@ export default function IngestionGateway() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }} className="pulse" />
             <span className="text-mono" style={{ color: 'var(--color-on-muted)' }}>
-              AWAITING DATA INPUT [SYS.READY]
+              {processing || textBusy ? 'GEMINI EXTRACTING CONSTRAINTS…' : 'AWAITING DATA INPUT [SYS.READY]'}
             </span>
           </div>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            marginBottom: 20, padding: '12px 20px', borderRadius: 10,
+            background: 'rgba(255,119,138,0.08)', border: '1px solid rgba(255,119,138,0.3)',
+            display: 'flex', alignItems: 'center', gap: 12, maxWidth: 1200,
+          }}>
+            <span className="material-symbols-outlined" style={{ color: 'var(--color-error)', fontSize: 20 }}>error</span>
+            <span className="text-mono" style={{ color: 'var(--color-error)', fontSize: 12 }}>{error}</span>
+            <button onClick={() => setError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, maxWidth: 1200 }}>
           {/* Left: Upload Zone */}
@@ -95,7 +139,7 @@ export default function IngestionGateway() {
                   background: dragging ? 'rgba(78,222,163,0.05)' : 'transparent',
                   transition: 'all 0.2s',
                 }}
-                onClick={() => fileRef.current?.click()}
+                onClick={() => !processing && fileRef.current?.click()}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-primary)', marginBottom: 16, opacity: dragging ? 1 : 0.5 }}>
                   upload_file
@@ -103,9 +147,9 @@ export default function IngestionGateway() {
                 {processing ? (
                   <>
                     <p className="text-mono" style={{ color: 'var(--color-primary)' }}>PROCESSING: {fileName}</p>
-                    <p className="text-label" style={{ color: 'var(--color-on-muted)', marginTop: 8 }}>LLM EXTRACTING CONSTRAINTS…</p>
+                    <p className="text-label" style={{ color: 'var(--color-on-muted)', marginTop: 8 }}>GEMINI EXTRACTING CONSTRAINTS…</p>
                     <div style={{ marginTop: 16, height: 2, width: 200, background: 'rgba(78,222,163,0.15)', borderRadius: 1, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: 'var(--color-primary)', borderRadius: 1, animation: 'progressBar 2.2s linear forwards', width: '0%' }} />
+                      <div className="indeterminate-bar" style={{ height: '100%', background: 'var(--color-primary)', borderRadius: 1 }} />
                     </div>
                   </>
                 ) : processed ? (
@@ -124,28 +168,28 @@ export default function IngestionGateway() {
               <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={handleFileSelect} />
             </div>
 
-            {/* Brain Dump + Voice */}
-            <div className="glass" style={{ borderRadius: 16, padding: 24, display: 'flex', gap: 16 }}>
-              <div style={{ flex: 1 }}>
+            {/* Brain Dump */}
+            <div className="glass" style={{ borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
                 <label className="text-label" style={{ color: 'var(--color-primary)', display: 'block', marginBottom: 10 }}>BRAIN DUMP</label>
                 <textarea
                   className="kronos-input"
-                  style={{ height: 120, resize: 'none' }}
+                  style={{ height: 120, resize: 'none', width: '100%' }}
                   placeholder="Enter unstructured tasks, thoughts, deadlines, raw data…"
                   value={brainDump}
                   onChange={e => setBrainDump(e.target.value)}
+                  onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') ingestText() }}
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                <button className="glass" style={{
-                  width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(78,222,163,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: 'var(--color-primary)', transition: 'all 0.2s',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 28 }}>mic</span>
-                </button>
-                <span className="text-label" style={{ color: 'var(--color-primary)', fontSize: 9 }}>VOICE</span>
-              </div>
+              <button
+                className="btn-primary"
+                onClick={ingestText}
+                disabled={textBusy || !brainDump.trim()}
+                style={{ padding: '12px 0', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, opacity: textBusy || !brainDump.trim() ? 0.6 : 1 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{textBusy ? 'sync' : 'auto_awesome'}</span>
+                {textBusy ? 'EXTRACTING…' : 'EXTRACT CONSTRAINTS'}
+              </button>
             </div>
           </div>
 
@@ -162,8 +206,8 @@ export default function IngestionGateway() {
                 background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.2)',
                 borderRadius: 8, padding: '4px 12px',
               }}>
-                <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>PR:</span>
-                <span className="text-mono" style={{ color: 'var(--color-primary)' }}>87.4%</span>
+                <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>CONSTRAINTS:</span>
+                <span className="text-mono" style={{ color: 'var(--color-primary)' }}>{tasks.length}</span>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-secondary)' }} />
               </div>
             </div>
@@ -172,7 +216,7 @@ export default function IngestionGateway() {
                 <col />
                 <col style={{ width: 68 }} />
                 <col style={{ width: 56 }} />
-                <col style={{ width: 112 }} />
+                <col style={{ width: 124 }} />
                 <col style={{ width: 34 }} />
               </colgroup>
               <thead>
@@ -188,12 +232,17 @@ export default function IngestionGateway() {
                 {tasks.map(t => (
                   <tr key={t.id}>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</td>
-                    <td style={{ color: 'var(--color-secondary)', whiteSpace: 'nowrap' }}>{t.due.slice(5)}</td>
-                    <td style={{ color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>{t.hours}h</td>
+                    <td style={{ color: 'var(--color-secondary)', whiteSpace: 'nowrap' }}>{t.due_date.slice(5)}</td>
+                    <td style={{ color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>{t.workload_hours}h</td>
                     <td style={{ padding: '6px 8px' }}>
-                      <select className="kronos-input" style={{ padding: '3px 4px', fontSize: 11, width: '100%' }} defaultValue={t.stress}>
-                        {['High Stress', 'Moderate Focus', 'Light/Easy'].map(o => (
-                          <option key={o}>{o}</option>
+                      <select
+                        className="kronos-input"
+                        style={{ padding: '3px 4px', fontSize: 11, width: '100%' }}
+                        value={weightToStress(t.cognitive_weight)}
+                        onChange={e => updateTask(t.id, { cognitive_weight: stressToWeight(e.target.value as StressLabel) })}
+                      >
+                        {(['high', 'medium', 'low'] as StressLabel[]).map(o => (
+                          <option key={o} value={o}>{STRESS_LABELS[o]}</option>
                         ))}
                       </select>
                     </td>
@@ -207,6 +256,13 @@ export default function IngestionGateway() {
                     </td>
                   </tr>
                 ))}
+                {hydrated && tasks.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--color-on-muted)', padding: '32px 0' }}>
+                      <span className="text-mono" style={{ fontSize: 12 }}>No constraints yet — drop a PDF or brain-dump above.</span>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -245,7 +301,8 @@ export default function IngestionGateway() {
       </main>
 
       <style>{`
-        @keyframes progressBar { from { width: 0% } to { width: 100% } }
+        @keyframes indeterminate { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
+        .indeterminate-bar { width: 33%; animation: indeterminate 1.1s ease-in-out infinite; }
       `}</style>
     </div>
   )

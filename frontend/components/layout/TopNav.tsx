@@ -1,6 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { api, ApiError } from '@/lib/api/client'
+import { useStore } from '@/lib/store/TaskStore'
 
 const links = [
   { href: '/',          label: 'Ingestion' },
@@ -12,6 +15,37 @@ const links = [
 
 export default function TopNav() {
   const path = usePathname()
+  const { userId, setUserId } = useStore()
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authErr, setAuthErr] = useState<string | null>(null)
+
+  // Capture ?user_id= handed back by the OAuth callback, then clean the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const uid = params.get('user_id')
+    if (uid && Number(uid)) {
+      setUserId(Number(uid))
+      params.delete('user_id')
+      const qs = params.toString()
+      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''))
+    }
+  }, [setUserId])
+
+  const connect = async () => {
+    if (authBusy) return
+    setAuthErr(null)
+    setAuthBusy(true)
+    try {
+      const { auth_url } = await api.googleAuthUrl()
+      window.location.href = auth_url
+    } catch (e) {
+      setAuthErr(e instanceof ApiError ? e.message : 'Auth unavailable')
+      setAuthBusy(false)
+    }
+  }
+
+  const disconnect = () => setUserId(null)
+
   return (
     <header
       style={{
@@ -62,12 +96,43 @@ export default function TopNav() {
           })}
         </nav>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {userId ? (
+          <button
+            onClick={disconnect}
+            title={`Connected (user ${userId}) — click to disconnect`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(78,222,163,0.10)', border: '1px solid rgba(78,222,163,0.3)',
+              color: 'var(--color-primary)', cursor: 'pointer', padding: '6px 12px', borderRadius: 8,
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 6px var(--color-primary)' }} className="pulse" />
+            CALENDAR LINKED
+          </button>
+        ) : (
+          <button
+            onClick={connect}
+            disabled={authBusy}
+            title={authErr ?? 'Connect Google Calendar'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+              color: authErr ? 'var(--color-error)' : 'var(--color-on-muted)',
+              cursor: 'pointer', padding: '6px 12px', borderRadius: 8,
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+              transition: 'color 0.2s',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+              {authBusy ? 'sync' : 'calendar_add_on'}
+            </span>
+            {authBusy ? 'CONNECTING…' : authErr ? 'AUTH OFFLINE' : 'CONNECT CALENDAR'}
+          </button>
+        )}
         <button style={{ background: 'none', border: 'none', color: 'var(--color-on-muted)', cursor: 'pointer', padding: 8, borderRadius: 8, transition: 'color 0.2s' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>settings</span>
-        </button>
-        <button style={{ background: 'none', border: 'none', color: 'var(--color-on-muted)', cursor: 'pointer', padding: 8, borderRadius: 8, transition: 'color 0.2s' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>account_circle</span>
         </button>
       </div>
     </header>

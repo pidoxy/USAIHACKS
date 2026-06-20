@@ -3,31 +3,85 @@ import { useState } from 'react'
 import TopNav from '@/components/layout/TopNav'
 import SideNav from '@/components/layout/SideNav'
 import DialGauge from '@/components/ui/DialGauge'
+import Link from 'next/link'
+import { api, ApiError } from '@/lib/api/client'
+import { useStore, toOptimizeTasks, toSimulateTasks } from '@/lib/store/TaskStore'
+import type { ScheduledBlockOut } from '@/lib/api/types'
 
-const INITIAL_BARS = [40, 55, 30, 70, 65, 85, 90]
-const PROJECTED_BARS = [45, 60, 75]
+const heatToColor = (heat: string): string => {
+  const h = heat.toLowerCase()
+  if (h.includes('red')) return 'var(--color-error)'
+  if (h.includes('amber') || h.includes('orange') || h.includes('yellow')) return '#fbbf24'
+  return 'var(--color-primary)'
+}
 
-const NODE_ANALYSIS = [
-  { icon: 'hub',          sector: 'Alpha Node', desc: 'Routing Efficiency', value: '99.2%',   color: 'var(--color-primary)' },
-  { icon: 'network_node', sector: 'Beta Node',  desc: 'Latency Spike',     value: '42ms',    color: 'var(--color-tertiary)' },
-  { icon: 'router',       sector: 'Gamma Node', desc: 'Load Distribution', value: 'Balanced', color: 'var(--color-on-muted)' },
-]
+function dailyLoads(blocks: ScheduledBlockOut[]) {
+  const byDate = new Map<string, { hours: number; heat: string }>()
+  for (const b of blocks) {
+    const cur = byDate.get(b.date) ?? { hours: 0, heat: b.heat_color }
+    cur.hours += b.end_hour - b.start_hour
+    byDate.set(b.date, cur)
+  }
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, ...v }))
+}
 
 export default function Arbitrage() {
+  const { tasks, userId, lastArbitrage, setLastArbitrage, lastSimulation, setLastSimulation } = useStore()
   const [running, setRunning] = useState(false)
-  const [executed, setExecuted] = useState(false)
-  const [rp, setRp] = useState(94)
-  const [entropy, setEntropy] = useState(2.4)
+  const [error, setError] = useState<string | null>(null)
+  const [committing, setCommitting] = useState(false)
+  const [commitMsg, setCommitMsg] = useState<string | null>(null)
 
-  const executeArbitrage = () => {
+  const arb = lastArbitrage
+  const sim = lastSimulation
+  const rp = sim ? Math.round(sim.path_resilience) : 0
+  const entropy = arb ? Math.round(arb.final_sc * 10) / 10 : sim ? Math.round(sim.avg_sc * 10) / 10 : 0
+
+  const executeArbitrage = async () => {
+    if (tasks.length === 0) {
+      setError('No tasks to optimise — ingest a syllabus or brain-dump first.')
+      return
+    }
+    setError(null)
+    setCommitMsg(null)
     setRunning(true)
-    setTimeout(() => {
+    try {
+      const [arbRes, simRes] = await Promise.all([
+        api.arbitrage({
+          tasks: toOptimizeTasks(tasks),
+          fixed_events: [],
+          n_days: 14,
+          user_id: userId ?? undefined,
+        }),
+        api.simulate({ tasks: toSimulateTasks(tasks), n_runs: 50, hours_of_sleep: 7 }),
+      ])
+      setLastArbitrage(arbRes)
+      setLastSimulation(simRes)
+    } catch (e) {
+      setError(e instanceof ApiError ? `Arbitrage failed: ${e.message}` : 'Arbitrage failed.')
+    } finally {
       setRunning(false)
-      setExecuted(true)
-      setRp(prev => Math.min(99, prev + 3))
-      setEntropy(prev => Math.max(0.5, prev - 0.4))
-    }, 2000)
+    }
   }
+
+  const commit = async () => {
+    if (!userId || !arb?.scenario_cache_id) return
+    setCommitting(true)
+    setCommitMsg(null)
+    try {
+      await api.commit({ user_id: userId, scenario_cache_id: arb.scenario_cache_id })
+      setCommitMsg('Schedule written to your Google Calendar.')
+    } catch (e) {
+      setCommitMsg(e instanceof ApiError ? `Commit failed: ${e.message}` : 'Commit failed.')
+    } finally {
+      setCommitting(false)
+    }
+  }
+
+  const loads = arb ? dailyLoads(arb.scheduled) : []
+  const maxHours = Math.max(...loads.map(l => l.hours), 1)
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -42,7 +96,8 @@ export default function Arbitrage() {
               Tactical Arbitrage
             </h1>
             <p className="text-body" style={{ color: 'var(--color-on-muted)', maxWidth: 560 }}>
-              Real-time path resilience and entropy analysis. System is operating within optimal cognitive comfort parameters.
+              Deterministic constraint solver — slides {tasks.length} flexible deep-work blocks into safe windows while
+              guaranteeing your sleep floor. Zero LLM calls; pure scipy optimisation.
             </p>
           </div>
           <button
@@ -54,21 +109,50 @@ export default function Arbitrage() {
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
               {running ? 'sync' : 'bolt'}
             </span>
-            {running ? 'OPTIMISING…' : executed ? 'RE-RUN ARBITRAGE' : 'EXECUTE ARBITRAGE'}
+            {running ? 'OPTIMISING…' : arb ? 'RE-RUN ARBITRAGE' : 'EXECUTE ARBITRAGE'}
           </button>
         </div>
 
+        {error && (
+          <div style={{
+            marginBottom: 24, padding: '12px 20px', borderRadius: 10,
+            background: 'rgba(255,119,138,0.08)', border: '1px solid rgba(255,119,138,0.3)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <span className="material-symbols-outlined" style={{ color: 'var(--color-error)', fontSize: 20 }}>error</span>
+            <span className="text-mono" style={{ color: 'var(--color-error)' }}>{error}</span>
+          </div>
+        )}
+
         {/* Status banner */}
-        {executed && (
+        {arb && !error && (
           <div style={{
             marginBottom: 24, padding: '12px 20px', borderRadius: 10,
             background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.25)',
-            display: 'flex', alignItems: 'center', gap: 12,
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
           }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 20 }}>check_circle</span>
             <span className="text-mono" style={{ color: 'var(--color-primary)' }}>
-              ARBITRAGE COMPLETE — Constraint solver rearranged 3 deep-work blocks. Sleep guarantee: 7.2h/night.
+              ARBITRAGE {arb.status.toUpperCase()} — {arb.scheduled.length} blocks across {arb.total_days} days.
+              Sleep guarantee: {arb.sleep_guarantee_hours}h/night.
+              {arb.unscheduled_ids.length > 0 ? ` ${arb.unscheduled_ids.length} could not fit.` : ' All tasks placed.'}
             </span>
+            {userId && arb.scenario_cache_id != null && (
+              <button
+                className="btn-ghost"
+                onClick={commit}
+                disabled={committing}
+                style={{ marginLeft: 'auto', padding: '6px 16px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
+                {committing ? 'WRITING…' : 'COMMIT TO CALENDAR'}
+              </button>
+            )}
+          </div>
+        )}
+        {commitMsg && (
+          <div style={{ marginBottom: 24, padding: '10px 18px', borderRadius: 10, background: 'rgba(189,194,255,0.08)', border: '1px solid rgba(189,194,255,0.25)' }}>
+            <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12 }}>{commitMsg}</span>
           </div>
         )}
 
@@ -76,116 +160,112 @@ export default function Arbitrage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
           {/* Path Resilience Dial */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <DialGauge value={rp} label="Path Resilience" sublabel={rp > 80 ? 'OPTIMAL' : 'WARNING'} variant="primary" />
+            <DialGauge value={rp} label="Path Resilience" sublabel={rp >= 80 ? 'OPTIMAL' : rp >= 50 ? 'STABLE' : rp > 0 ? 'AT RISK' : 'NO DATA'} variant={rp >= 50 ? 'primary' : 'error'} />
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>Baseline: 82%</span>
-              <span className="text-mono" style={{ color: 'var(--color-primary)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_upward</span>
-                +{rp - 82}%
+              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>
+                {sim ? `${sim.survival_count}/${sim.total_runs} survived` : 'Run to populate'}
+              </span>
+              <span className="text-mono" style={{ color: 'var(--color-primary)', fontSize: 12 }}>
+                {sim ? 'live Monte Carlo' : '—'}
               </span>
             </div>
           </div>
 
           {/* System Entropy Dial */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <DialGauge value={entropy} max={10} label="System Entropy" sublabel={entropy < 4 ? 'STABLE' : 'ELEVATED'} unit="k" variant="secondary" />
+            <DialGauge value={entropy} max={15} label="System Entropy" sublabel={entropy < 6 ? 'STABLE' : entropy < 10 ? 'ELEVATED' : 'CRITICAL'} unit=" Sc" variant="secondary" />
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>Threshold: 4.0k</span>
-              <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_downward</span>
-                {(4 - entropy).toFixed(1)}k headroom
+              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>Context-switch tax</span>
+              <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12 }}>
+                {arb ? 'optimised' : '—'}
               </span>
             </div>
           </div>
 
-          {/* Node Analysis */}
+          {/* Schedule Analysis */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, background: 'rgba(78,222,163,0.04)', borderRadius: '0 0 0 100%', filter: 'blur(20px)' }} />
-            <h3 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>NODE ANALYSIS</h3>
+            <h3 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>SCHEDULE ANALYSIS</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {NODE_ANALYSIS.map(n => (
+              {[
+                { icon: 'view_agenda', sector: 'Blocks Scheduled', value: arb ? String(arb.scheduled.length) : '—', color: 'var(--color-primary)' },
+                { icon: 'calendar_month', sector: 'Days Span', value: arb ? String(arb.total_days) : '—', color: 'var(--color-secondary)' },
+                { icon: 'bedtime', sector: 'Sleep Guarantee', value: arb ? `${arb.sleep_guarantee_hours}h` : '—', color: '#fbbf24' },
+                { icon: 'error', sector: 'Unscheduled', value: arb ? String(arb.unscheduled_ids.length) : '—', color: arb && arb.unscheduled_ids.length ? 'var(--color-error)' : 'var(--color-on-muted)' },
+              ].map(n => (
                 <div
                   key={n.sector}
                   style={{
                     padding: '12px 14px', borderRadius: 10,
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)',
-                    cursor: 'pointer', transition: 'background 0.2s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ color: n.color, fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
                     <span style={{ color: 'var(--color-on-surface)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', flex: 1, whiteSpace: 'nowrap' }}>{n.sector}</span>
-                    <span className="text-mono" style={{ color: n.color, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{n.value}</span>
+                    <span className="text-mono" style={{ color: n.color, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{n.value}</span>
                   </div>
-                  <p className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 10, paddingLeft: 24 }}>{n.desc}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Timeline Projection */}
-          <div className="glass" style={{ gridColumn: 'span 12', borderRadius: 20, padding: 24, height: 280, display: 'flex', flexDirection: 'column' }}>
+          {/* Timeline Projection — real daily load */}
+          <div className="glass" style={{ gridColumn: 'span 12', borderRadius: 20, padding: 24, minHeight: 280, display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h3 className="text-label" style={{ color: 'var(--color-on-muted)' }}>TIMELINE PROJECTION</h3>
+              <h3 className="text-label" style={{ color: 'var(--color-on-muted)' }}>DAILY DEEP-WORK LOAD PROJECTION</h3>
               <div style={{ display: 'flex', gap: 20 }}>
                 {[
-                  { dot: 'rgba(78,222,163,0.5)', label: 'Actual' },
-                  { dot: 'transparent', label: 'Projected', dashed: true },
-                ].map(({ dot, label, dashed }) => (
+                  { dot: 'var(--color-primary)', label: 'Light' },
+                  { dot: '#fbbf24', label: 'Moderate' },
+                  { dot: 'var(--color-error)', label: 'Heavy' },
+                ].map(({ dot, label }) => (
                   <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: dot,
-                      border: dashed ? '1px dashed rgba(78,222,163,0.5)' : 'none',
-                    }} />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot }} />
                     <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 11 }}>{label}</span>
                   </span>
                 ))}
               </div>
             </div>
 
-            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 12, paddingBottom: 28, position: 'relative' }}>
-              {/* NOW marker */}
-              <div style={{
-                position: 'absolute',
-                left: `${(INITIAL_BARS.length / (INITIAL_BARS.length + PROJECTED_BARS.length)) * 100}%`,
-                top: 0, bottom: 28, width: 2,
-                background: 'rgba(255,178,185,0.7)',
-                boxShadow: '0 0 10px rgba(255,178,185,0.5)',
-                zIndex: 5,
-              }}>
-                <span style={{
-                  position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)',
-                  background: 'rgba(255,178,185,0.15)', border: '1px solid rgba(255,178,185,0.4)',
-                  color: 'var(--color-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10,
-                  padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap',
-                }}>NOW</span>
+            {loads.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 13 }}>
+                  Run arbitrage to project your daily cognitive load across the planning window.
+                </span>
               </div>
-
-              {INITIAL_BARS.map((h, i) => (
-                <div key={i} className="bar-col" style={{ flex: 1, height: `${h}%` }}>
-                  <div className="bar-fill" style={{ height: '100%' }} />
-                </div>
-              ))}
-              {PROJECTED_BARS.map((h, i) => (
-                <div key={i} className="bar-col projected" style={{ flex: 1, height: `${h}%` }}>
-                  <div className="bar-fill" style={{ height: '100%' }} />
-                </div>
-              ))}
-
-              {/* X axis */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                display: 'flex', justifyContent: 'space-between',
-              }}>
-                {['-4h','-3h','-2h','-1h','T-0','+1h','+2h'].map(l => (
-                  <span key={l} className="text-mono" style={{ color: 'rgba(187,202,191,0.35)', fontSize: 10 }}>{l}</span>
-                ))}
+            ) : (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 8, paddingBottom: 28, position: 'relative' }}>
+                {loads.map((l, i) => {
+                  const c = heatToColor(l.heat)
+                  return (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', position: 'relative' }}>
+                      <span className="text-mono" style={{ color: c, fontSize: 10, marginBottom: 4 }}>{l.hours}h</span>
+                      <div
+                        title={`${l.date}: ${l.hours}h scheduled`}
+                        style={{
+                          width: '70%', height: `${Math.max(6, (l.hours / maxHours) * 88)}%`,
+                          background: `${c}30`, border: `1px solid ${c}`,
+                          borderRadius: '4px 4px 0 0', boxShadow: `0 -2px 10px ${c}40`,
+                        }}
+                      />
+                      <span className="text-mono" style={{ position: 'absolute', bottom: -22, color: 'rgba(187,202,191,0.5)', fontSize: 9 }}>{l.date.slice(5)}</span>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            )}
           </div>
+        </div>
+
+        {/* Footer nav */}
+        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+          <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>VIEW SHADOW CALENDAR</button>
+          </Link>
+          <Link href="/sandbox" style={{ textDecoration: 'none' }}>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>STRESS-TEST THIS SCHEDULE</button>
+          </Link>
         </div>
       </main>
     </div>
