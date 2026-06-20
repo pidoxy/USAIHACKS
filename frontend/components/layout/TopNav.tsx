@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api/client'
 import { useStore } from '@/lib/store/TaskStore'
+import Logo from '@/components/ui/Logo'
 
 const links = [
   { href: '/',          label: 'Ingestion' },
@@ -64,9 +65,7 @@ export default function TopNav() {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
-          <span className="text-display" style={{ fontSize: 22, letterSpacing: '0.25em', color: 'var(--color-primary)' }}>
-            KRONOS
-          </span>
+          <Logo size={26} fontSize={22} />
         </Link>
         <nav style={{ display: 'flex', gap: 4 }}>
           {links.map(l => {

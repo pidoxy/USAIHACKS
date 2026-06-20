@@ -24,9 +24,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Explicit production origins + localhost. The regex additionally covers Vercel
+# preview deploys, which each get a unique *.vercel.app subdomain. Note: the
+# frontend normally calls the API same-origin via a Next.js rewrite proxy, so
+# these matter for direct calls and the OAuth flow.
+ALLOWED_ORIGINS = list(dict.fromkeys([
+    settings.FRONTEND_URL,
+    "https://usaihacks.vercel.app",
+    "http://localhost:3000",
+]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
