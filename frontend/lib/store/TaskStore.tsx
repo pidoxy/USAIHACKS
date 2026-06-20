@@ -48,41 +48,6 @@ export function withIds(tasks: ExtractedTask[]): KronosTask[] {
   return tasks.map((t) => ({ ...t, id: newTaskId(), completed_hours: 0 }));
 }
 
-/* ---------- seed data (only used on a truly empty first visit) ---------- */
-
-const SEED_TASKS: KronosTask[] = [
-  {
-    id: "seed-1",
-    title: "Advanced Calc Midterm Prep",
-    due_date: "2026-06-28",
-    workload_hours: 12,
-    cognitive_weight: 1.8,
-    is_flexible: true,
-    category: "Study",
-    completed_hours: 0,
-  },
-  {
-    id: "seed-2",
-    title: "Read Chapter 4: Thermodynamics",
-    due_date: "2026-06-22",
-    workload_hours: 3.5,
-    cognitive_weight: 1.0,
-    is_flexible: true,
-    category: "Reading",
-    completed_hours: 0,
-  },
-  {
-    id: "seed-3",
-    title: "Lab Report: Circuit Analysis",
-    due_date: "2026-06-25",
-    workload_hours: 6,
-    cognitive_weight: 1.3,
-    is_flexible: true,
-    category: "Lab",
-    completed_hours: 0,
-  },
-];
-
 /* ---------- context ---------- */
 
 interface StoreShape {
@@ -93,8 +58,6 @@ interface StoreShape {
   removeTask: (id: string) => void;
   updateTask: (id: string, patch: Partial<KronosTask>) => void;
   clearTasks: () => void;
-  resetToSeed: () => void;
-
   lastArbitrage: ArbitrageResponse | null;
   setLastArbitrage: (r: ArbitrageResponse | null) => void;
 
@@ -112,7 +75,7 @@ const LS_USER = "kronos.userId";
 
 export function TaskStoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
-  const [tasks, setTasksState] = useState<KronosTask[]>(SEED_TASKS);
+  const [tasks, setTasksState] = useState<KronosTask[]>([]);
   const [lastArbitrage, setLastArbitrage] = useState<ArbitrageResponse | null>(
     null,
   );
@@ -123,18 +86,25 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
 
   // Hydrate from localStorage on mount (client only).
   useEffect(() => {
-    try {
-      const rawTasks = localStorage.getItem(LS_TASKS);
-      if (rawTasks) {
-        const parsed = JSON.parse(rawTasks) as KronosTask[];
-        if (Array.isArray(parsed)) setTasksState(parsed);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const rawTasks = localStorage.getItem(LS_TASKS);
+        if (rawTasks) {
+          const parsed = JSON.parse(rawTasks) as KronosTask[];
+          if (Array.isArray(parsed)) setTasksState(parsed);
+        }
+        const rawUser = localStorage.getItem(LS_USER);
+        if (rawUser) setUserIdState(Number(rawUser) || null);
+      } catch {
+        /* ignore corrupt storage */
       }
-      const rawUser = localStorage.getItem(LS_USER);
-      if (rawUser) setUserIdState(Number(rawUser) || null);
-    } catch {
-      /* ignore corrupt storage */
-    }
-    setHydrated(true);
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Proactively wake the engine — Render's free tier spins down when idle,
@@ -181,7 +151,6 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
   const clearTasks = useCallback(() => setTasksState([]), []);
-  const resetToSeed = useCallback(() => setTasksState(SEED_TASKS), []);
   const setUserId = useCallback((id: number | null) => setUserIdState(id), []);
 
   const value = useMemo<StoreShape>(
@@ -193,7 +162,6 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
       removeTask,
       updateTask,
       clearTasks,
-      resetToSeed,
       lastArbitrage,
       setLastArbitrage,
       lastSimulation,
@@ -209,7 +177,6 @@ export function TaskStoreProvider({ children }: { children: ReactNode }) {
       removeTask,
       updateTask,
       clearTasks,
-      resetToSeed,
       lastArbitrage,
       lastSimulation,
       userId,

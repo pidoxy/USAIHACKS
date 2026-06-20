@@ -1,17 +1,20 @@
 'use client'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { CalendarSync, Link2, LoaderCircle } from 'lucide-react'
 import { api, ApiError } from '@/lib/api/client'
 import { useStore } from '@/lib/store/TaskStore'
 import Logo from '@/components/ui/Logo'
+import type { MeResponse } from '@/lib/api/types'
 
 const links = [
-  { href: '/',          label: 'Ingestion' },
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/arbitrage', label: 'Arbitrage'  },
-  { href: '/sandbox',   label: 'Simulation' },
-  { href: '/analytics', label: 'Analytics'  },
+  { href: '/', label: 'Add Tasks' },
+  { href: '/dashboard', label: 'Overview' },
+  { href: '/arbitrage', label: 'Plan' },
+  { href: '/sandbox', label: 'Stress Test' },
+  { href: '/analytics', label: 'Insights' },
 ]
 
 export default function TopNav() {
@@ -19,8 +22,8 @@ export default function TopNav() {
   const { userId, setUserId } = useStore()
   const [authBusy, setAuthBusy] = useState(false)
   const [authErr, setAuthErr] = useState<string | null>(null)
+  const [me, setMe] = useState<MeResponse | null>(null)
 
-  // Capture ?user_id= handed back by the OAuth callback, then clean the URL.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const uid = params.get('user_id')
@@ -31,6 +34,23 @@ export default function TopNav() {
       window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''))
     }
   }, [setUserId])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    api.me(userId)
+      .then((res) => {
+        if (!cancelled) setMe(res)
+      })
+      .catch(() => {
+        if (!cancelled) setMe(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const activeMe = userId ? me : null
 
   const connect = async () => {
     if (authBusy) return
@@ -48,91 +68,53 @@ export default function TopNav() {
   const disconnect = () => setUserId(null)
 
   return (
-    <header
-      style={{
-        position: 'fixed', top: 40, left: 40, right: 40, zIndex: 50,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '14px 24px',
-        background: 'rgba(24,31,49,0.35)',
-        backdropFilter: 'blur(24px)',
-        borderTop:   '1px solid rgba(255,255,255,0.10)',
-        borderLeft:  '1px solid rgba(255,255,255,0.06)',
-        borderRight: '1px solid rgba(0,0,0,0.20)',
-        borderBottom:'1px solid rgba(0,0,0,0.25)',
-        borderRadius: 16,
-        boxShadow: '0 8px 32px rgba(78,222,163,0.08)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <Logo size={26} fontSize={22} />
+    <header className="topnav-shell">
+      <div className="topnav-brand">
+        <Link href="/" className="topnav-logo">
+          <Logo size={28} fontSize={20} />
         </Link>
-        <nav style={{ display: 'flex', gap: 4 }}>
-          {links.map(l => {
-            const active = path === l.href
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.07em',
-                  textTransform: 'uppercase',
-                  textDecoration: 'none',
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  color: active ? 'var(--color-primary)' : 'var(--color-on-muted)',
-                  background: active ? 'rgba(78,222,163,0.10)' : 'transparent',
-                  borderBottom: active ? '2px solid var(--color-primary)' : '2px solid transparent',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {l.label}
-              </Link>
-            )
-          })}
-        </nav>
+        <div className="topnav-status">
+          <span className="glow-dot pulse" />
+          <span className="text-mono">Plan schoolwork with your real calendar</span>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+      <nav className="topnav-links" aria-label="Primary">
+        {links.map((l) => {
+          const active = path === l.href
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={`topnav-link${active ? ' is-active' : ''}`}
+            >
+              {l.label}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="topnav-actions">
         {userId ? (
           <button
             onClick={disconnect}
-            title={`Connected (user ${userId}) — click to disconnect`}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'rgba(78,222,163,0.10)', border: '1px solid rgba(78,222,163,0.3)',
-              color: 'var(--color-primary)', cursor: 'pointer', padding: '6px 12px', borderRadius: 8,
-              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            }}
+            title={`${activeMe?.email ?? `Connected user ${userId}`} — click to disconnect`}
+            className="topnav-connection is-live"
           >
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 6px var(--color-primary)' }} className="pulse" />
-            CALENDAR LINKED
+            <Link2 size={14} />
+            <span>{activeMe?.name ? `${activeMe.name} Linked` : 'Calendar Linked'}</span>
           </button>
         ) : (
           <button
             onClick={connect}
             disabled={authBusy}
             title={authErr ?? 'Connect Google Calendar'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-              color: authErr ? 'var(--color-error)' : 'var(--color-on-muted)',
-              cursor: 'pointer', padding: '6px 12px', borderRadius: 8,
-              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-              transition: 'color 0.2s',
-            }}
+            className={`topnav-connection${authErr ? ' is-error' : ''}`}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-              {authBusy ? 'sync' : 'calendar_add_on'}
-            </span>
-            {authBusy ? 'CONNECTING…' : authErr ? 'AUTH OFFLINE' : 'CONNECT CALENDAR'}
+            {authBusy ? <LoaderCircle size={14} className="spin" /> : <CalendarSync size={14} />}
+            <span>{authBusy ? 'Connecting...' : authErr ? 'Auth Offline' : 'Connect Calendar'}</span>
           </button>
         )}
-        <button style={{ background: 'none', border: 'none', color: 'var(--color-on-muted)', cursor: 'pointer', padding: 8, borderRadius: 8, transition: 'color 0.2s' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>settings</span>
-        </button>
       </div>
     </header>
   )

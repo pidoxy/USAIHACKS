@@ -22,7 +22,6 @@ export default function DialGauge({
   const radius = 64
   const circumference = 2 * Math.PI * radius
   const pct = Math.min(value / max, 1)
-  const offset = circumference * (1 - pct * 0.8) // 80% arc
 
   const colors: Record<string, string> = {
     primary:   '#4edea3',

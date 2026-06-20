@@ -1,12 +1,11 @@
 'use client'
-import { useState } from 'react'
-import TopNav from '@/components/layout/TopNav'
-import SideNav from '@/components/layout/SideNav'
+import { useEffect, useMemo, useState } from 'react'
 import DialGauge from '@/components/ui/DialGauge'
 import Link from 'next/link'
+import AppShell from '@/components/layout/AppShell'
 import { api, ApiError } from '@/lib/api/client'
 import { useStore, toOptimizeTasks, toSimulateTasks } from '@/lib/store/TaskStore'
-import type { ScheduledBlockOut } from '@/lib/api/types'
+import type { FixedEventIn, FixedEventOut, ScheduledBlockOut } from '@/lib/api/types'
 
 const heatToColor = (heat: string): string => {
   const h = heat.toLowerCase()
@@ -33,11 +32,49 @@ export default function Arbitrage() {
   const [error, setError] = useState<string | null>(null)
   const [committing, setCommitting] = useState(false)
   const [commitMsg, setCommitMsg] = useState<string | null>(null)
+  const [fixedEvents, setFixedEvents] = useState<FixedEventOut[]>([])
+  const [calendarBusy, setCalendarBusy] = useState(false)
+  const [calendarMsg, setCalendarMsg] = useState<string | null>(null)
 
   const arb = lastArbitrage
   const sim = lastSimulation
   const rp = sim ? Math.round(sim.path_resilience) : 0
   const entropy = arb ? Math.round(arb.final_sc * 10) / 10 : sim ? Math.round(sim.avg_sc * 10) / 10 : 0
+  const fixedEventInputs = useMemo<FixedEventIn[]>(
+    () =>
+      (userId ? fixedEvents : []).map((event) => ({
+        id: event.id,
+        title: event.title,
+        start_dt: event.start_dt,
+        end_dt: event.end_dt,
+      })),
+    [fixedEvents, userId],
+  )
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setCalendarBusy(true)
+      api.calendarEvents(userId)
+        .then((events) => {
+          if (cancelled) return
+          setFixedEvents(events)
+          setCalendarMsg(`Synced ${events.length} fixed event${events.length === 1 ? '' : 's'} from Google Calendar.`)
+        })
+        .catch((e) => {
+          if (cancelled) return
+          setCalendarMsg(e instanceof ApiError ? e.message : 'Calendar sync unavailable.')
+        })
+        .finally(() => {
+          if (!cancelled) setCalendarBusy(false)
+        })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const executeArbitrage = async () => {
     if (tasks.length === 0) {
@@ -51,7 +88,7 @@ export default function Arbitrage() {
       const [arbRes, simRes] = await Promise.all([
         api.arbitrage({
           tasks: toOptimizeTasks(tasks),
-          fixed_events: [],
+          fixed_events: fixedEventInputs,
           n_days: 14,
           user_id: userId ?? undefined,
         }),
@@ -82,43 +119,84 @@ export default function Arbitrage() {
 
   const loads = arb ? dailyLoads(arb.scheduled) : []
   const maxHours = Math.max(...loads.map(l => l.hours), 1)
+  const activeFixedEvents = userId ? fixedEvents : []
+  const refreshCalendar = async () => {
+    if (!userId || calendarBusy) return
+    setCalendarBusy(true)
+    setCalendarMsg(null)
+    try {
+      const events = await api.calendarEvents(userId)
+      setFixedEvents(events)
+      setCalendarMsg(`Synced ${events.length} fixed event${events.length === 1 ? '' : 's'} from Google Calendar.`)
+    } catch (e) {
+      setCalendarMsg(e instanceof ApiError ? e.message : 'Calendar sync unavailable.')
+    } finally {
+      setCalendarBusy(false)
+    }
+  }
+
+  const clearCalendar = async () => {
+    if (!userId || calendarBusy) return
+    setCalendarBusy(true)
+    setCalendarMsg(null)
+    try {
+      const res = await api.deleteKronosEvents(userId)
+      const deleted = typeof res === 'object' && res && 'deleted' in res ? Number((res as { deleted?: unknown }).deleted ?? 0) : 0
+      setCalendarMsg(`Removed ${deleted} KRONOS event${deleted === 1 ? '' : 's'} from Google Calendar.`)
+    } catch (e) {
+      setCalendarMsg(e instanceof ApiError ? e.message : 'Could not clear KRONOS calendar events.')
+    } finally {
+      setCalendarBusy(false)
+    }
+  }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <TopNav />
-      <SideNav active="Focus Mode" />
-
-      <main style={{ paddingTop: 160, paddingLeft: 120, paddingRight: 48, paddingBottom: 48 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 }}>
-          <div>
-            <h1 className="text-display" style={{ color: 'var(--color-on-surface)', marginBottom: 8 }}>
-              Tactical Arbitrage
-            </h1>
-            <p className="text-body" style={{ color: 'var(--color-on-muted)', maxWidth: 560 }}>
-              Deterministic constraint solver — slides {tasks.length} flexible deep-work blocks into safe windows while
-              guaranteeing your sleep floor. Zero LLM calls; pure scipy optimisation.
-            </p>
+    <AppShell active="Arbitrage">
+      <div className="page-stack">
+        <section className="page-hero">
+          <span className="hero-kicker">Plan builder</span>
+          <div className="hero-title-row">
+            <div className="hero-copy">
+              <h1 className="text-display" style={{ color: 'var(--color-on-surface)', marginBottom: 8 }}>
+                Build My Study Plan
+              </h1>
+              <p className="text-body" style={{ maxWidth: 620 }}>
+                Turn your task list into a realistic study plan that fits around your calendar and keeps your week manageable.
+              </p>
+            </div>
+            <div className="hero-actions">
+              <button
+                className="btn-primary"
+                onClick={executeArbitrage}
+                disabled={running}
+                style={{ opacity: running ? 0.8 : 1 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                  {running ? 'sync' : 'bolt'}
+                </span>
+                {running ? 'BUILDING…' : arb ? 'REBUILD PLAN' : 'BUILD PLAN'}
+              </button>
+            </div>
           </div>
-          <button
-            className="btn-primary"
-            onClick={executeArbitrage}
-            disabled={running}
-            style={{ padding: '18px 40px', display: 'flex', alignItems: 'center', gap: 10, opacity: running ? 0.8 : 1 }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-              {running ? 'sync' : 'bolt'}
+          <div className="hero-meta">
+            <span className="meta-pill">{tasks.length} tasks in play</span>
+            <span className="meta-pill">{arb ? `${arb.total_days} day plan window` : 'No plan built yet'}</span>
+            <span className="meta-pill">{userId ? `${activeFixedEvents.length} calendar events synced` : 'Connect calendar to plan around classes'}</span>
+          </div>
+        </section>
+
+        {userId && (
+          <div className="status-banner">
+            <span className="text-mono" style={{ color: 'var(--color-on-surface)' }}>
+              {calendarBusy ? 'Syncing Google Calendar…' : calendarMsg ?? `Using ${activeFixedEvents.length} calendar event${activeFixedEvents.length === 1 ? '' : 's'} to protect your existing schedule.`}
             </span>
-            {running ? 'OPTIMISING…' : arb ? 'RE-RUN ARBITRAGE' : 'EXECUTE ARBITRAGE'}
-          </button>
-        </div>
+            <button className="btn-ghost" onClick={refreshCalendar} disabled={calendarBusy}>Refresh Calendar</button>
+            <button className="btn-ghost" onClick={clearCalendar} disabled={calendarBusy}>Remove Planned Events</button>
+          </div>
+        )}
 
         {error && (
-          <div style={{
-            marginBottom: 24, padding: '12px 20px', borderRadius: 10,
-            background: 'rgba(255,119,138,0.08)', border: '1px solid rgba(255,119,138,0.3)',
-            display: 'flex', alignItems: 'center', gap: 12,
-          }}>
+          <div className="status-banner is-error">
             <span className="material-symbols-outlined" style={{ color: 'var(--color-error)', fontSize: 20 }}>error</span>
             <span className="text-mono" style={{ color: 'var(--color-error)' }}>{error}</span>
           </div>
@@ -126,16 +204,12 @@ export default function Arbitrage() {
 
         {/* Status banner */}
         {arb && !error && (
-          <div style={{
-            marginBottom: 24, padding: '12px 20px', borderRadius: 10,
-            background: 'rgba(78,222,163,0.08)', border: '1px solid rgba(78,222,163,0.25)',
-            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          }}>
+          <div className="status-banner is-success">
             <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 20 }}>check_circle</span>
             <span className="text-mono" style={{ color: 'var(--color-primary)' }}>
-              ARBITRAGE {arb.status.toUpperCase()} — {arb.scheduled.length} blocks across {arb.total_days} days.
-              Sleep guarantee: {arb.sleep_guarantee_hours}h/night.
-              {arb.unscheduled_ids.length > 0 ? ` ${arb.unscheduled_ids.length} could not fit.` : ' All tasks placed.'}
+              Plan ready: {arb.scheduled.length} study block{arb.scheduled.length === 1 ? '' : 's'} across {arb.total_days} days.
+              Sleep target: {arb.sleep_guarantee_hours}h each night.
+              {arb.unscheduled_ids.length > 0 ? ` ${arb.unscheduled_ids.length} task${arb.unscheduled_ids.length === 1 ? '' : 's'} could not fit yet.` : ' All tasks were placed.'}
             </span>
             {userId && arb.scenario_cache_id != null && (
               <button
@@ -145,39 +219,39 @@ export default function Arbitrage() {
                 style={{ marginLeft: 'auto', padding: '6px 16px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
-                {committing ? 'WRITING…' : 'COMMIT TO CALENDAR'}
+                {committing ? 'SAVING…' : 'SAVE TO CALENDAR'}
               </button>
             )}
           </div>
         )}
         {commitMsg && (
-          <div style={{ marginBottom: 24, padding: '10px 18px', borderRadius: 10, background: 'rgba(189,194,255,0.08)', border: '1px solid rgba(189,194,255,0.25)' }}>
+          <div className="status-banner is-info">
             <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12 }}>{commitMsg}</span>
           </div>
         )}
 
         {/* Bento grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
+        <div className="grid-12">
           {/* Path Resilience Dial */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <DialGauge value={rp} label="Path Resilience" sublabel={rp >= 80 ? 'OPTIMAL' : rp >= 50 ? 'STABLE' : rp > 0 ? 'AT RISK' : 'NO DATA'} variant={rp >= 50 ? 'primary' : 'error'} />
+            <DialGauge value={rp} label="Plan Strength" sublabel={rp >= 80 ? 'STRONG' : rp >= 50 ? 'OKAY' : rp > 0 ? 'RISKY' : 'NO DATA'} variant={rp >= 50 ? 'primary' : 'error'} />
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>
-                {sim ? `${sim.survival_count}/${sim.total_runs} survived` : 'Run to populate'}
+                {sim ? `${sim.survival_count}/${sim.total_runs} test runs held up` : 'Build plan to fill this'}
               </span>
               <span className="text-mono" style={{ color: 'var(--color-primary)', fontSize: 12 }}>
-                {sim ? 'live Monte Carlo' : '—'}
+                {sim ? 'from stress test' : '—'}
               </span>
             </div>
           </div>
 
           {/* System Entropy Dial */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-            <DialGauge value={entropy} max={15} label="System Entropy" sublabel={entropy < 6 ? 'STABLE' : entropy < 10 ? 'ELEVATED' : 'CRITICAL'} unit=" Sc" variant="secondary" />
+            <DialGauge value={entropy} max={15} label="Schedule Pressure" sublabel={entropy < 6 ? 'LOW' : entropy < 10 ? 'MEDIUM' : 'HIGH'} unit=" Sc" variant="secondary" />
             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>Context-switch tax</span>
+              <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>How scattered your week feels</span>
               <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12 }}>
-                {arb ? 'optimised' : '—'}
+                {arb ? 'updated' : '—'}
               </span>
             </div>
           </div>
@@ -185,13 +259,13 @@ export default function Arbitrage() {
           {/* Schedule Analysis */}
           <div className="glass" style={{ gridColumn: 'span 4', borderRadius: 20, padding: 24, minHeight: 300, position: 'relative' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: 100, height: 100, background: 'rgba(78,222,163,0.04)', borderRadius: '0 0 0 100%', filter: 'blur(20px)' }} />
-            <h3 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>SCHEDULE ANALYSIS</h3>
+            <h3 className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>PLAN SUMMARY</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { icon: 'view_agenda', sector: 'Blocks Scheduled', value: arb ? String(arb.scheduled.length) : '—', color: 'var(--color-primary)' },
-                { icon: 'calendar_month', sector: 'Days Span', value: arb ? String(arb.total_days) : '—', color: 'var(--color-secondary)' },
-                { icon: 'bedtime', sector: 'Sleep Guarantee', value: arb ? `${arb.sleep_guarantee_hours}h` : '—', color: '#fbbf24' },
-                { icon: 'error', sector: 'Unscheduled', value: arb ? String(arb.unscheduled_ids.length) : '—', color: arb && arb.unscheduled_ids.length ? 'var(--color-error)' : 'var(--color-on-muted)' },
+                { icon: 'view_agenda', sector: 'Study Blocks', value: arb ? String(arb.scheduled.length) : '—', color: 'var(--color-primary)' },
+                { icon: 'calendar_month', sector: 'Days Covered', value: arb ? String(arb.total_days) : '—', color: 'var(--color-secondary)' },
+                { icon: 'bedtime', sector: 'Sleep Each Night', value: arb ? `${arb.sleep_guarantee_hours}h` : '—', color: '#fbbf24' },
+                { icon: 'error', sector: 'Not Scheduled', value: arb ? String(arb.unscheduled_ids.length) : '—', color: arb && arb.unscheduled_ids.length ? 'var(--color-error)' : 'var(--color-on-muted)' },
               ].map(n => (
                 <div
                   key={n.sector}
@@ -213,7 +287,7 @@ export default function Arbitrage() {
           {/* Timeline Projection — real daily load */}
           <div className="glass" style={{ gridColumn: 'span 12', borderRadius: 20, padding: 24, minHeight: 280, display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h3 className="text-label" style={{ color: 'var(--color-on-muted)' }}>DAILY DEEP-WORK LOAD PROJECTION</h3>
+              <h3 className="text-label" style={{ color: 'var(--color-on-muted)' }}>STUDY TIME BY DAY</h3>
               <div style={{ display: 'flex', gap: 20 }}>
                 {[
                   { dot: 'var(--color-primary)', label: 'Light' },
@@ -231,7 +305,7 @@ export default function Arbitrage() {
             {loads.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 13 }}>
-                  Run arbitrage to project your daily cognitive load across the planning window.
+                  Build a plan to see how your study time is spread across the next few days.
                 </span>
               </div>
             ) : (
@@ -259,15 +333,15 @@ export default function Arbitrage() {
         </div>
 
         {/* Footer nav */}
-        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+        <div className="action-row">
           <Link href="/dashboard" style={{ textDecoration: 'none' }}>
-            <button className="btn-ghost" style={{ padding: '12px 32px' }}>VIEW SHADOW CALENDAR</button>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>SEE OVERVIEW</button>
           </Link>
           <Link href="/sandbox" style={{ textDecoration: 'none' }}>
-            <button className="btn-ghost" style={{ padding: '12px 32px' }}>STRESS-TEST THIS SCHEDULE</button>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>TEST THIS PLAN</button>
           </Link>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

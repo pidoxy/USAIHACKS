@@ -1,8 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
-import TopNav from '@/components/layout/TopNav'
-import SideNav from '@/components/layout/SideNav'
 import Link from 'next/link'
+import AppShell from '@/components/layout/AppShell'
 import { useStore, weightToStress } from '@/lib/store/TaskStore'
 
 const stressMeta = {
@@ -62,15 +61,38 @@ export default function Dashboard() {
   const dayBlocks = lastArbitrage?.scheduled.filter(b => b.date === activeDay) ?? []
 
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <TopNav />
-      <SideNav active="Focus Mode" />
+    <AppShell active="Dashboard">
+      <div className="page-stack">
+        <section className="page-hero">
+          <span className="hero-kicker">Overview</span>
+          <div className="hero-title-row">
+            <div className="hero-copy">
+              <h1 className="text-headline" style={{ color: 'var(--color-on-surface)', marginBottom: 8 }}>
+                See what is due, what feels heavy, and what to do next
+              </h1>
+              <p className="text-body">
+                This screen gives you one simple view of your workload, your task order, and your upcoming study blocks.
+              </p>
+            </div>
+            <div className="hero-actions">
+              <Link href="/arbitrage" style={{ textDecoration: 'none' }}>
+                <button className="btn-primary">Build Plan</button>
+              </Link>
+              <Link href="/sandbox" style={{ textDecoration: 'none' }}>
+                <button className="btn-ghost">Test My Week</button>
+              </Link>
+            </div>
+          </div>
+          <div className="hero-meta">
+            <span className="meta-pill">{tasks.length} active tasks</span>
+            <span className="meta-pill">{lastArbitrage ? `${lastArbitrage.scheduled.length} projected blocks` : 'No schedule projection yet'}</span>
+          </div>
+        </section>
 
-      <main style={{ paddingTop: 160, paddingLeft: 120, paddingRight: 48, paddingBottom: 48 }}>
-        <div style={{ display: 'flex', gap: 24, height: 'calc(100vh - 220px)' }}>
+        <div className="dashboard-grid" style={{ minHeight: 'calc(100vh - 420px)' }}>
 
           {/* Left: Deficit Debt + Priority Queue */}
-          <div style={{ width: '38%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="stack-col">
             {/* Deficit Debt */}
             <div className="glass" style={{ borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
               <div style={{
@@ -78,8 +100,8 @@ export default function Dashboard() {
                 width: 120, height: 120, borderRadius: '50%',
                 background: 'rgba(255,119,138,0.08)', filter: 'blur(32px)',
               }} />
-              <h2 className="text-headline-sm" style={{ color: 'var(--color-on-surface)', marginBottom: 4 }}>Deficit Debt</h2>
-              <p className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>UNRESOLVED COGNITIVE LOAD</p>
+              <h2 className="text-headline-sm" style={{ color: 'var(--color-on-surface)', marginBottom: 4 }}>Workload Left</h2>
+              <p className="text-label" style={{ color: 'var(--color-on-muted)', marginBottom: 20 }}>Remaining hours across all tasks</p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 20 }}>
                 <span className="text-display" style={{ color: load.high > load.low ? 'var(--color-error)' : 'var(--color-primary)', fontSize: 52 }}>
                   {(load.low + load.med + load.high).toFixed(1)}h
@@ -102,7 +124,7 @@ export default function Dashboard() {
             {/* Priority Queue */}
             <div className="glass" style={{ borderRadius: 16, padding: 24, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h3 className="text-headline-sm" style={{ color: 'var(--color-on-surface)' }}>Priority Queue</h3>
+                <h3 className="text-headline-sm" style={{ color: 'var(--color-on-surface)' }}>Task Order</h3>
                 <Link href="/" style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', display: 'flex' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_circle</span>
                 </Link>
@@ -150,7 +172,7 @@ export default function Dashboard() {
           </div>
 
           {/* Right: Shadow Calendar */}
-          <div className="glass" style={{ flex: 1, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+          <div className="glass" style={{ minHeight: 560, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
             <div style={{
               position: 'absolute', top: -80, left: -80,
               width: 200, height: 200, borderRadius: '50%',
@@ -159,7 +181,7 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, position: 'relative', zIndex: 1 }}>
               <div>
-                <h2 className="text-headline-sm" style={{ color: 'var(--color-on-surface)' }}>Shadow Calendar</h2>
+                <h2 className="text-headline-sm" style={{ color: 'var(--color-on-surface)' }}>Planned Study Blocks</h2>
                 {activeDay && <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 12 }}>{activeDay}</span>}
               </div>
               {scheduleDays.length > 0 ? (
@@ -170,7 +192,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <Link href="/arbitrage" style={{ textDecoration: 'none' }}>
-                  <button className="btn-ghost" style={{ padding: '6px 16px', fontSize: 11 }}>RUN ARBITRAGE</button>
+                    <button className="btn-ghost" style={{ padding: '6px 16px', fontSize: 11 }}>BUILD PLAN</button>
                 </Link>
               )}
             </div>
@@ -210,7 +232,7 @@ export default function Dashboard() {
               {scheduleDays.length === 0 && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 13, textAlign: 'center', maxWidth: 280 }}>
-                    No shadow schedule yet. Run <Link href="/arbitrage" style={{ color: 'var(--color-primary)' }}>Tactical Arbitrage</Link> to project deep-work blocks here.
+                    No study plan yet. Run <Link href="/arbitrage" style={{ color: 'var(--color-primary)' }}>Build Plan</Link> to fill this with suggested work sessions.
                   </span>
                 </div>
               )}
@@ -233,23 +255,23 @@ export default function Dashboard() {
         </div>
 
         {/* Bottom action bar */}
-        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+        <div className="action-row">
           <Link href="/arbitrage" style={{ textDecoration: 'none' }}>
             <button className="btn-primary" style={{ padding: '12px 32px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
-                RUN ARBITRAGE PROTOCOL
+                BUILD STUDY PLAN
               </span>
             </button>
           </Link>
           <Link href="/sandbox" style={{ textDecoration: 'none' }}>
-            <button className="btn-ghost" style={{ padding: '12px 32px' }}>STRESS TEST SANDBOX</button>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>TEST MY WEEK</button>
           </Link>
           <Link href="/analytics" style={{ textDecoration: 'none' }}>
-            <button className="btn-ghost" style={{ padding: '12px 32px' }}>VIEW ANALYTICS</button>
+            <button className="btn-ghost" style={{ padding: '12px 32px' }}>SEE INSIGHTS</button>
           </Link>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

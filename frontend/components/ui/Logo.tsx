@@ -56,10 +56,13 @@ export default function Logo({
   fontSize?: number
 }) {
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <span className="logo-lockup">
       <LogoMark size={size} />
       {wordmark && (
-        <span className="text-display" style={{ fontSize, letterSpacing: '0.25em', color: 'var(--color-primary)', lineHeight: 1 }}>
+        <span
+          className="text-display logo-wordmark"
+          style={{ fontSize }}
+        >
           KRONOS
         </span>
       )}

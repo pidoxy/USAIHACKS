@@ -1,19 +1,10 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import TopNav from '@/components/layout/TopNav'
-import SideNav from '@/components/layout/SideNav'
+import AppShell from '@/components/layout/AppShell'
 import { api } from '@/lib/api/client'
 import { useStore } from '@/lib/store/TaskStore'
 import type { VelocityProfile, MeResponse } from '@/lib/api/types'
-
-const DEMO_RATIOS: Record<string, number> = {
-  'Algorithm Optimization': 1.63,
-  'Report Writing': 1.6,
-  'Code Review': 1.3,
-  'Data Analysis': 1.6,
-  'System Design': 1.44,
-}
 
 function chronotypeOf(me: MeResponse | null) {
   const t = String(me?.circadian_type ?? '').toLowerCase()
@@ -32,24 +23,25 @@ export default function Analytics() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!userId) {
-      setProfile(null)
-      setMe(null)
-      return
-    }
+    if (!userId) return
     let cancelled = false
-    setLoading(true)
-    Promise.allSettled([api.velocityProfile(userId), api.me(userId)]).then(([p, m]) => {
+    queueMicrotask(() => {
       if (cancelled) return
-      if (p.status === 'fulfilled') setProfile(p.value)
-      if (m.status === 'fulfilled') setMe(m.value)
-      setLoading(false)
+      setLoading(true)
+      Promise.allSettled([api.velocityProfile(userId), api.me(userId)]).then(([p, m]) => {
+        if (cancelled) return
+        if (p.status === 'fulfilled') setProfile(p.value)
+        if (m.status === 'fulfilled') setMe(m.value)
+        setLoading(false)
+      })
     })
     return () => { cancelled = true }
   }, [userId])
 
-  const isLive = !!profile
-  const eta0 = profile?.eta_0 && profile.eta_0 > 0 ? Math.min(1, profile.eta_0) : 1.0
+  const activeProfile = userId ? profile : null
+  const activeMe = userId ? me : null
+  const isLive = !!activeProfile
+  const eta0 = activeProfile?.eta_0 && activeProfile.eta_0 > 0 ? Math.min(1, activeProfile.eta_0) : 1.0
 
   // η(t) decay curve seeded by the user's personalised base efficiency.
   const etaCurve = useMemo(
@@ -58,56 +50,57 @@ export default function Analytics() {
   )
 
   const ratios = useMemo(() => {
-    const r = profile?.category_ratios && Object.keys(profile.category_ratios).length
-      ? profile.category_ratios
-      : DEMO_RATIOS
-    return Object.entries(r).map(([task, multiplier]) => ({ task, multiplier }))
-  }, [profile])
+    const r = activeProfile?.category_ratios && Object.keys(activeProfile.category_ratios).length
+      ? activeProfile.category_ratios
+      : null
+    return r ? Object.entries(r).map(([task, multiplier]) => ({ task, multiplier })) : []
+  }, [activeProfile])
 
-  const avgMultiplier = ratios.reduce((s, v) => s + v.multiplier, 0) / (ratios.length || 1)
-  const chrono = chronotypeOf(me)
+  const avgMultiplier = ratios.length
+    ? ratios.reduce((s, v) => s + v.multiplier, 0) / ratios.length
+    : 1
+  const chrono = chronotypeOf(activeMe)
   const etaColor = (v: number) => (v >= 0.7 ? 'var(--color-primary)' : v >= 0.4 ? '#fbbf24' : 'var(--color-error)')
 
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <TopNav />
-      <SideNav active="Analytics" />
-
-      <main style={{ paddingTop: 160, paddingLeft: 120, paddingRight: 48, paddingBottom: 48 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 24 }}>
-          <div>
-            <h1 className="text-headline" style={{ color: 'var(--color-on-surface)', marginBottom: 6 }}>Behavioral Analytics</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: isLive ? 'var(--color-primary)' : 'var(--color-on-muted)', boxShadow: isLive ? '0 0 6px var(--color-primary)' : 'none' }} className={isLive ? 'pulse' : ''} />
-              <span className="text-mono" style={{ color: 'var(--color-on-muted)' }}>
-                {loading ? 'SYNCING LEARNING ENGINE…' : isLive ? `LEARNING ENGINE · ${profile?.total_records ?? 0} RECORDS` : 'DEMO DATA — CONNECT CALENDAR FOR YOUR PROFILE'}
-              </span>
+    <AppShell active="Analytics">
+      <div className="page-stack">
+        <section className="page-hero">
+          <span className="hero-kicker">Insights</span>
+          <div className="hero-title-row">
+            <div className="hero-copy">
+              <h1 className="text-headline" style={{ color: 'var(--color-on-surface)', marginBottom: 6 }}>Study Insights</h1>
+              <p className="text-body">
+                Learn when you work best, how fast tasks really take you, and how your study habits change over time.
+              </p>
+            </div>
+            <div className="hero-meta">
+              {[
+                { label: 'η₀', value: eta0.toFixed(2), color: 'var(--color-primary)' },
+                { label: 'VEL', value: `×${avgMultiplier.toFixed(2)}`, color: 'var(--color-secondary)' },
+              ].map(({ label, value, color }) => (
+                <span key={label} className="meta-pill" style={{ color }}>
+                  {label}: {value}
+                </span>
+              ))}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            {[
-              { label: 'η₀:', value: eta0.toFixed(2), color: 'var(--color-primary)' },
-              { label: 'VEL:', value: `×${avgMultiplier.toFixed(2)}`, color: 'var(--color-secondary)' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ background: 'rgba(24,31,49,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="text-label" style={{ color: 'var(--color-on-muted)', fontSize: 9 }}>{label}</span>
-                <span className="text-mono" style={{ color, fontSize: 13, borderLeft: `1px solid ${color}40`, paddingLeft: 10 }}>{value}</span>
-              </div>
-            ))}
+          <div className="hero-meta">
+            <span className="meta-pill">{loading ? 'Loading profile' : isLive ? `${activeProfile?.total_records ?? 0} study records` : 'No study data yet'}</span>
+            <span className="meta-pill">{chrono.type}</span>
           </div>
-        </div>
+        </section>
 
         {!isLive && !loading && (
-          <div style={{ marginBottom: 24, padding: '12px 20px', borderRadius: 10, background: 'rgba(189,194,255,0.06)', border: '1px solid rgba(189,194,255,0.2)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="status-banner is-info">
             <span className="material-symbols-outlined" style={{ color: 'var(--color-secondary)', fontSize: 20 }}>info</span>
             <span className="text-mono" style={{ color: 'var(--color-secondary)', fontSize: 12 }}>
-              Showing representative demo curves. Use <strong>Connect Calendar</strong> (top-right) to load your real velocity multipliers and chronotype.
+              No study history yet. Connect your calendar and use the app a bit more to unlock personal timing and pacing insights.
             </span>
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
+        <div className="grid-12">
           {/* η(t) Efficiency Decay Chart */}
           <div className="glass" style={{ gridColumn: 'span 8', borderRadius: 16, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -120,7 +113,7 @@ export default function Analytics() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(78,222,163,0.08)', padding: '4px 12px', borderRadius: 20, border: '1px solid rgba(78,222,163,0.2)' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: isLive ? 'var(--color-primary)' : 'var(--color-on-muted)' }} className={isLive ? 'pulse' : ''} />
-                <span className="text-label" style={{ color: isLive ? 'var(--color-primary)' : 'var(--color-on-muted)', fontSize: 9 }}>{isLive ? 'LIVE' : 'DEMO'}</span>
+                <span className="text-label" style={{ color: isLive ? 'var(--color-primary)' : 'var(--color-on-muted)', fontSize: 9 }}>{isLive ? 'LIVE' : 'EMPTY'}</span>
               </div>
             </div>
 
@@ -211,7 +204,7 @@ export default function Analytics() {
           <div className="glass" style={{ gridColumn: 'span 12', borderRadius: 16, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(78,222,163,0.1)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 18 }}>speed</span>
-              <span className="text-label" style={{ color: 'var(--color-on-muted)' }}>VELOCITY INSIGHTS — {isLive ? 'PER-CATEGORY NORMALIZATION' : 'HISTORICAL (DEMO)'}</span>
+              <span className="text-label" style={{ color: 'var(--color-on-muted)' }}>VELOCITY INSIGHTS — {isLive ? 'PER-CATEGORY NORMALIZATION' : 'NO RECORDED DATA YET'}</span>
             </div>
             <table className="kronos-table">
               <thead>
@@ -239,17 +232,24 @@ export default function Analytics() {
                     </tr>
                   )
                 })}
+                {ratios.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', color: 'var(--color-on-muted)', padding: '28px 12px' }}>
+                      No timing data yet. Your real study-speed insights will appear here after backend records are available.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        <div style={{ marginTop: 24 }}>
+        <div className="action-row">
           <Link href="/dashboard" style={{ textDecoration: 'none' }}>
             <button className="btn-ghost" style={{ padding: '12px 32px' }}>← BACK TO DASHBOARD</button>
           </Link>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }
