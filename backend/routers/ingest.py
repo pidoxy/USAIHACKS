@@ -106,7 +106,7 @@ def _call_gemini(prompt: str) -> dict:
 class ExtractedTask(BaseModel):
     title: str
     due_date: str
-    workload_hours: float = Field(ge=0.5, le=200.0)
+    workload_hours: float = Field(ge=0.1, le=200.0)
     cognitive_weight: float = Field(default=1.0, ge=1.0, le=3.0)
     is_flexible: bool = True
     category: str = "General"

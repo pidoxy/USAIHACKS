@@ -210,13 +210,10 @@ export default function IngestionGateway() {
                 <div style={{ flex: 1, height: 1, background: 'var(--color-outline)' }} />
               </div>
 
-              {/* Voice recorder — auto-ingests on stop */}
+              {/* Voice recorder — pastes transcript, user clicks ADD TASKS */}
               <VoiceRecorder
                 disabled={textBusy}
-                onTranscript={(text) => {
-                  setBrainDump(text)
-                  ingestText(text)
-                }}
+                onTranscript={(text) => setBrainDump(text)}
               />
             </div>
           </div>
