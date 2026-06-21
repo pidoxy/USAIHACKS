@@ -56,12 +56,13 @@ export default function IngestionGateway() {
     if (file) ingestFile(file)
   }
 
-  const ingestText = async () => {
-    if (!brainDump.trim() || textBusy) return
+  const ingestText = async (override?: string) => {
+    const content = override ?? brainDump
+    if (!content.trim() || textBusy) return
     setError(null)
     setTextBusy(true)
     try {
-      const res = await api.ingestText(brainDump.trim())
+      const res = await api.ingestText(content.trim())
       addTasks(withIds(res.tasks))
       setBrainDump('')
     } catch (e) {
@@ -98,7 +99,7 @@ export default function IngestionGateway() {
           </div>
           <div className="hero-meta">
             <span className="meta-pill">{tasks.length} tasks loaded</span>
-            <span className="meta-pill">{processing || textBusy ? 'Reading your input' : 'Ready for new tasks'}</span>
+            <span className="meta-pill">{processing ? 'Reading file…' : textBusy ? 'Extracting tasks…' : 'Ready for new tasks'}</span>
           </div>
         </section>
 
@@ -194,7 +195,7 @@ export default function IngestionGateway() {
               </div>
               <button
                 className="btn-primary"
-                onClick={ingestText}
+                onClick={() => ingestText()}
                 disabled={textBusy || !brainDump.trim()}
                 style={{ padding: '12px 0', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, opacity: textBusy || !brainDump.trim() ? 0.6 : 1 }}
               >
@@ -209,11 +210,12 @@ export default function IngestionGateway() {
                 <div style={{ flex: 1, height: 1, background: 'var(--color-outline)' }} />
               </div>
 
-              {/* Voice recorder */}
+              {/* Voice recorder — auto-ingests on stop */}
               <VoiceRecorder
                 disabled={textBusy}
                 onTranscript={(text) => {
-                  setBrainDump(prev => prev ? prev + '\n' + text : text)
+                  setBrainDump(text)
+                  ingestText(text)
                 }}
               />
             </div>
