@@ -3,6 +3,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import AppShell from '@/components/layout/AppShell'
 import { api, ApiError } from '@/lib/api/client'
+import VoiceRecorder from '@/components/ui/VoiceRecorder'
 import {
   useStore,
   withIds,
@@ -85,7 +86,7 @@ export default function IngestionGateway() {
                 Add your tasks and turn them into a clear study plan
               </h1>
               <p className="text-body" style={{ maxWidth: 760 }}>
-                Paste your notes, upload a syllabus, or drop in a messy task list. KRONOS will pull out due dates,
+                Paste your notes, upload a syllabus, drop in a task list, or just speak. KRONOS pulls out due dates,
                 study time, and task difficulty so you can plan faster.
               </p>
             </div>
@@ -200,6 +201,21 @@ export default function IngestionGateway() {
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{textBusy ? 'sync' : 'auto_awesome'}</span>
                 {textBusy ? 'ADDING…' : 'ADD TASKS'}
               </button>
+
+              {/* Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--color-outline)' }} />
+                <span className="text-mono" style={{ color: 'var(--color-on-muted)', fontSize: 10, letterSpacing: '0.08em' }}>OR SPEAK</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--color-outline)' }} />
+              </div>
+
+              {/* Voice recorder */}
+              <VoiceRecorder
+                disabled={textBusy}
+                onTranscript={(text) => {
+                  setBrainDump(prev => prev ? prev + '\n' + text : text)
+                }}
+              />
             </div>
           </div>
 
@@ -294,9 +310,9 @@ export default function IngestionGateway() {
         {/* Feature cards */}
         <div className="feature-grid" style={{ maxWidth: 1320 }}>
           {[
-            { icon: 'psychology', title: 'Energy-aware planning', desc: 'Balance workload with how demanding tasks feel', color: 'var(--color-primary)' },
+            { icon: 'mic',         title: 'Voice task capture', desc: 'Speak your tasks — live transcription via Spitch AI', color: 'var(--color-error)' },
+            { icon: 'psychology',  title: 'Energy-aware planning', desc: 'Balance workload with how demanding tasks feel', color: 'var(--color-primary)' },
             { icon: 'casino',      title: 'Stress testing', desc: 'Try your plan against rough weeks before they happen', color: 'var(--color-secondary)' },
-            { icon: 'tune',        title: 'Calendar-friendly plan', desc: 'Build study blocks around classes and events', color: '#fbbf24' },
             { icon: 'speed',       title: 'Personal pacing', desc: 'Learn how long your work really takes', color: 'var(--color-tertiary)' },
           ].map(card => (
             <div key={card.title} className="glass" style={{ borderRadius: 16, padding: 24 }}>

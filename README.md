@@ -1,148 +1,119 @@
-# Kronos
+# KRONOS
 
-Plan your study week around real life.
+**Turn academic chaos into a plan that survives real life.**
 
-Kronos is an AI-assisted academic planning system that helps students turn messy task lists, PDF syllabi, and calendar commitments into a realistic study plan. Instead of stopping at reminders and to-do lists, Kronos helps answer harder questions:
+KRONOS is an AI-powered study planning system for students. You dump in your syllabi, task lists, or just talk — KRONOS pulls out every deadline and workload estimate, builds a schedule around your actual calendar, and stress-tests that schedule before the week starts.
 
-- What should I work on next?
-- Can I actually finish this on time?
-- What happens if I lose a study day?
-- How do I plan around classes, events, and my real schedule?
+**Live demo → [usaihacks.vercel.app](https://usaihacks.vercel.app)**  
+**API docs → [usaihacks.onrender.com/docs](https://usaihacks.onrender.com/docs)**
 
-It combines structured AI extraction, deterministic scheduling, and stress-testing to help students build plans they can actually follow.
+---
 
-## Product preview
+## The problem
 
-![Kronos cover](docs/media/cover-thumbnail.png)
+Students don't fail because they forget to write things down. They fail because turning a pile of assignments into a real plan — one that fits their classes, energy levels, and the randomness of actual life — is genuinely hard. Most tools stop at reminders. KRONOS goes further.
 
-### Gallery
+---
 
-| Capture | Dashboard |
-| --- | --- |
-| ![Task capture](docs/media/task-capture-mobile.png) | ![Dashboard](docs/media/dashboard.png) |
+## What it does
 
-| Schedule optimizer | Stress test |
-| --- | --- |
-| ![Schedule optimizer](docs/media/schedule-optimizer.png) | ![Stress test](docs/media/stress-test.png) |
+### 1. Capture anything
+- **Voice input** — speak your tasks, get live transcription powered by Spitch AI
+- **Text paste** — drop in a brain dump, assignment list, or email thread
+- **PDF upload** — drag in a syllabus and KRONOS extracts every deadline automatically
 
-## What Kronos does
+### 2. Extract structure
+Gemini 2.5 Flash reads your input and produces a structured task list: title, due date, workload hours, and cognitive intensity — enforced via JSON schema, no hallucinations.
 
-Kronos supports an end-to-end study planning workflow:
+### 3. Build a real schedule
+A deterministic optimization engine (PuLP) converts tasks into time blocks that respect:
+- fixed events from Google Calendar
+- your chronotype (morning vs. evening person)
+- realistic daily study capacity
 
-1. Capture work from pasted text or uploaded PDFs.
-2. Extract structured tasks with due dates, workload, and cognitive intensity.
-3. Build a study plan around real calendar commitments.
-4. Stress-test that plan against disruptions and overload.
-5. Show insights about schedule pressure, pacing, and study patterns.
+### 4. Stress-test it
+Monte Carlo simulation runs your plan against disruption scenarios — sick days, late nights, unexpected work — and tells you how likely your plan is to hold.
 
-## Core capabilities
+### 5. Improve over time
+Velocity tracking measures how long your tasks actually take. Behavior signals adjust future planning weights so the schedule gets more accurate each week.
 
-- **Task ingestion**
-  Paste a brain dump or upload a syllabus and Kronos extracts structured academic tasks.
+---
 
-- **Plan building**
-  Convert tasks into a schedule that respects time windows, fixed events, and workload.
+## Feature highlights
 
-- **Stress testing**
-  Simulate rough weeks and see whether the current plan still holds.
+| Feature | Detail |
+|---|---|
+| Voice task capture | Live mic transcription via Spitch API with partial-result streaming |
+| PDF ingestion | Gemini extracts tasks from syllabi with structured output |
+| Text brain dump | Paste anything — KRONOS finds the tasks |
+| Study plan builder | Constraint-based optimization via PuLP |
+| Monte Carlo stress test | 1,000-scenario simulation to score plan resilience |
+| Google Calendar sync | Read fixed events, write study blocks back |
+| Velocity learning | Tracks actual vs. estimated time to refine future schedules |
+| Chronotype support | Plans around morning / evening energy preferences |
 
-- **Calendar-aware planning**
-  Link Google Calendar so Kronos can build around classes and existing commitments.
-
-- **Study insights**
-  Surface workload, pressure, pacing, and chronotype-style timing signals.
-
-## How it works
-
-Kronos uses AI where it is strongest, but does not hand the full planning problem to a model.
-
-### Inputs
-
-- pasted text and task dumps
-- uploaded PDF syllabi
-- user-linked Google Calendar events
-- due dates, workload estimates, and task metadata
-- behavior and study-history signals
-
-### Processing
-
-- **LLM-powered extraction** turns messy input into structured tasks
-- **deterministic optimization** builds a feasible study plan
-- **Monte Carlo simulation** stress-tests the plan under disruption
-- **velocity and behavior signals** personalize pacing and planning support
-
-### Outputs
-
-- structured task lists
-- a proposed study schedule
-- schedule pressure and resilience metrics
-- calendar-aware recommendations
-- student-friendly insight screens
+---
 
 ## Architecture
 
-Kronos is a monorepo with a Next.js frontend and a FastAPI backend.
+Monorepo with a Next.js 16 frontend on Vercel and a FastAPI backend on Render.
 
-```text
+```
 .
-├── frontend/   Next.js 16 + React 19 student-facing app
-└── backend/    FastAPI planning engine and integrations
+├── frontend/   Next.js 16 + React 19 (Vercel)
+└── backend/    FastAPI planning engine (Render)
 ```
 
-### Frontend
+The frontend talks to the backend through typed API helpers (`frontend/lib/api/`) and avoids CORS via a Next.js rewrite proxy. The WebSocket voice endpoint connects directly to the backend for real-time streaming.
 
-The frontend is built in `frontend/` and focuses on the student experience:
+### Backend routers
 
-- mobile-first task capture
-- dashboard and overview screens
-- plan builder
-- stress-test view
-- insights view
-- Google Calendar connection flow
+| Route | Purpose |
+|---|---|
+| `/api/ingest` | PDF and text task extraction (Gemini) |
+| `/api/voice` | Live mic transcription (Spitch) + one-shot audio |
+| `/api/simulate` | Monte Carlo stress testing |
+| `/api/optimize` | Schedule arbitrage and calendar write-back |
+| `/api/calendar` | Google Calendar read/write |
+| `/api/velocity` | Study velocity tracking |
+| `/api/behavior` | Snooze patterns and planning weight adjustment |
+| `/api/auth` | Google OAuth |
 
-The frontend talks to the backend through typed API helpers in [`frontend/lib/api`](frontend/lib/api) and shared client state in [`frontend/lib/store/TaskStore.tsx`](frontend/lib/store/TaskStore.tsx).
-
-### Backend
-
-The backend in `backend/` provides the planning engine:
-
-- auth and Google OAuth
-- calendar sync
-- text and PDF ingestion
-- optimization and arbitrage scheduling
-- Monte Carlo simulation
-- study velocity and behavior tracking
-
-The live deployed API is documented at [usaihacks.onrender.com/docs](https://usaihacks.onrender.com/docs).
+---
 
 ## Tech stack
 
-### Frontend
+**Frontend**
+- TypeScript · Next.js 16 · React 19
+- Tailwind CSS 4 · Framer Motion · Lucide React
 
-- TypeScript
-- Next.js 16
-- React 19
-- Tailwind CSS 4
-- Framer Motion
-- Lucide React
+**Backend**
+- Python · FastAPI · SQLAlchemy · PostgreSQL
+- PuLP (LP solver) · NumPy · SciPy
 
-### Backend
+**AI & APIs**
+- Gemini 2.5 Flash — structured task extraction
+- Spitch AI — speech-to-text with live streaming
+- Google OAuth + Calendar API
 
-- Python
-- FastAPI
-- SQLAlchemy
-- PostgreSQL
-- PuLP
-- NumPy
-- SciPy
+**Infrastructure**
+- Vercel (frontend) · Render (backend)
 
-### Integrations and services
+---
 
-- Google OAuth
-- Google Calendar API
-- Gemini / Google Generative AI
-- Vercel
-- Render
+## Voice feature
+
+The mic button on the capture screen opens a WebSocket to the KRONOS backend, which streams your audio to the Spitch speech-to-text API in 3-second chunks. Partial transcripts appear live as you speak. When you stop, the final transcript lands in the task input and gets processed by Gemini exactly like a typed brain dump.
+
+```
+Browser mic → MediaRecorder (webm/opus)
+    → WS /api/voice/live (FastAPI)
+        → Spitch REST (per-chunk)
+            → partial transcript → WS response
+→ Frontend live text → append to brain dump → Gemini extraction → task list
+```
+
+---
 
 ## Local development
 
@@ -154,7 +125,13 @@ npm install
 npm run dev
 ```
 
-By default the frontend proxies API requests to the deployed backend.
+By default, the frontend proxies `/api/*` requests to the deployed backend. To run against a local backend:
+
+```bash
+# frontend/.env.local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_ENGINE_ORIGIN=http://localhost:8000
+```
 
 ### Backend
 
@@ -166,47 +143,31 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-If you want to point the frontend at a local backend instead of the deployed one, use the variables in [`frontend/.env.example`](frontend/.env.example).
+Required environment variables (`.env`):
 
-## Notes on the frontend-backend contract
+```
+GEMINI_API_KEY=...
+SPITCH_API_KEY=...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
+FRONTEND_URL=http://localhost:3000
+```
 
-The frontend integrates against the deployed API contract, and the typed request/response layer lives in:
+---
 
-- [`frontend/lib/api/client.ts`](frontend/lib/api/client.ts)
-- [`frontend/lib/api/types.ts`](frontend/lib/api/types.ts)
+## Screenshots
 
-The frontend also uses same-origin `/api/*` routes with a Next.js rewrite to avoid CORS issues when deployed.
+| Task capture | Dashboard |
+|---|---|
+| ![Task capture](docs/media/task-capture-mobile.png) | ![Dashboard](docs/media/dashboard.png) |
 
-## Design direction
+| Schedule optimizer | Stress test |
+|---|---|
+| ![Schedule optimizer](docs/media/schedule-optimizer.png) | ![Stress test](docs/media/stress-test.png) |
 
-The current frontend uses a softer, cleaner visual system designed for students:
+---
 
-- mobile-first layouts
-- rounded soft-ui cards
-- simpler wording
-- low-friction navigation
-- consistent brand assets and app icons
+## Why KRONOS
 
-The goal is to make planning feel calmer and more approachable, not heavy or overly technical.
-
-## Devpost media
-
-The repo includes a small media kit in [`docs/media`](docs/media):
-
-- `cover-thumbnail.png`
-- `task-capture-mobile.png`
-- `dashboard.png`
-- `schedule-optimizer.png`
-- `stress-test.png`
-
-Suggested gallery order:
-
-1. `cover-thumbnail.png`
-2. `task-capture-mobile.png`
-3. `dashboard.png`
-4. `schedule-optimizer.png`
-5. `stress-test.png`
-
-## Why this project matters
-
-Students usually do not fail because they cannot write down tasks. They struggle because they cannot easily translate all of their commitments into a realistic plan. Kronos is built to close that gap by helping users capture chaos, build a schedule, and test whether that schedule can survive real life.
+Students usually have the tools to track tasks. What they rarely have is a system that translates those tasks into a plan that can survive the actual week — the late nights, the sick days, the class that runs long. KRONOS is built to close that gap: capture the chaos, extract the structure, build a real schedule, and test it before the week starts.

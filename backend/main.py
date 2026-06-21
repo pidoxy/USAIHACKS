@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from config import settings
-from routers import ingest, simulate, optimize, auth, calendar, velocity, behavior
+from routers import ingest, simulate, optimize, auth, calendar, velocity, behavior, voice
 
 
 @asynccontextmanager
@@ -50,6 +50,7 @@ app.include_router(optimize.router, prefix="/api/optimize", tags=["Optimization"
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(velocity.router, prefix="/api/velocity", tags=["Velocity"])
 app.include_router(behavior.router, prefix="/api/behavior", tags=["Behavior"])
+app.include_router(voice.router,    prefix="/api/voice",    tags=["Voice"])
 
 
 @app.get("/health")
